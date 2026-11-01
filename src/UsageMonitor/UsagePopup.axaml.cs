@@ -1109,7 +1109,9 @@ public partial class UsagePopup : Window
         Dispatcher.UIThread.Post(() =>
         {
             var tier = status.Staleness switch { "stale" => " (stale)", "little_stale" => " (a little stale)", _ => "" };
-            ConfigPathText.Text = $"Source: {_config.UsageApiUrl} · Updated {FormatFetchedAt(status.OldestFetchedAt)}{tier}";
+            var staleNames = status.StaleProviders is { Count: > 0 } keys
+                ? " · Stale: " + string.Join(", ", keys.Select(ProviderLabel)) : "";
+            ConfigPathText.Text = $"Source: {_config.UsageApiUrl} · Updated {FormatFetchedAt(status.OldestFetchedAt)}{tier}{staleNames}";
             ApplyOpenRouter(status.OpenRouter);
             ApplyOpenAi(status.OpenAi);
             ApplyJev(status.Jev);
@@ -2234,6 +2236,15 @@ public partial class UsagePopup : Window
 
         var normalized = planType.Replace('_', ' ');
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalized);
+    }
+
+    // "claude3" -> "Claude #3", "codex" -> "Codex", "openrouter" -> "Openrouter".
+    private static string ProviderLabel(string key)
+    {
+        var digits = key.Length - key.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9').Length;
+        var name = key[..(key.Length - digits)];
+        name = name.Length == 0 ? key : char.ToUpperInvariant(name[0]) + name[1..];
+        return digits == 0 ? name : $"{name} #{key[^digits..]}";
     }
 
     private static string FormatFetchedAt(DateTimeOffset? fetchedAt)

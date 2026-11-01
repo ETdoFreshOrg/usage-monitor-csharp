@@ -17,7 +17,10 @@ public record ZaiBlock(UsageWindow? FiveHour, UsageWindow? Monthly, long? Monthl
 public record OpenRouterBlock(double Usage, double? Limit, double? LimitRemaining, bool? IsFreeTier);
 public record OpenAiBlock(double SpendToday, double SpendMonth, string Currency);
 public record JevBlock(double Spend1Day, double Spend3Days, double Spend7Days, string Currency);
-public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Claude, CodexBlock? Codex);
+// Staleness/FetchedAt/Error come from the provider entry itself, so a card can say
+// "stale since …" when usage-api keeps serving an account's last good numbers.
+public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Claude, CodexBlock? Codex,
+    string? Staleness = null, DateTimeOffset? FetchedAt = null, string? Error = null);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
@@ -33,13 +36,28 @@ public record UsageApiStatus(
     // ("fresh" | "little_stale" | "stale"); null from older usage-api builds.
     DateTimeOffset? OldestFetchedAt = null,
     string? Staleness = null,
-    IReadOnlyList<UsageAccount>? AdditionalAccounts = null
+    IReadOnlyList<UsageAccount>? AdditionalAccounts = null,
+    // Provider keys (e.g. "claude3") whose data usage-api marks "stale". They are left
+    // out of OldestFetchedAt/Staleness so one frozen account doesn't make the whole
+    // footer read "Updated 30h ago"; the footer names them instead.
+    IReadOnlyList<string>? StaleProviders = null
 );
 
 public class UsageApiService : IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _url;
+    private string? _lastLoggedProblem;
+
+    // Console output goes to /dev/null when the app relaunches itself, so fetch problems
+    // also go to usage.log, once per distinct message rather than every refresh tick.
+    private void LogProblem(string? message)
+    {
+        if (message == _lastLoggedProblem) return;
+        _lastLoggedProblem = message;
+        if (message != null) Console.WriteLine(message);
+        AppLog.WriteLine(message ?? "usage-api: recovered");
+    }
 
     public UsageApiService(string baseUrl)
     {
@@ -55,7 +73,7 @@ public class UsageApiService : IDisposable
             using var resp = await _http.GetAsync(_url);
             if (!resp.IsSuccessStatusCode)
             {
-                Console.WriteLine($"usage-api HTTP {(int)resp.StatusCode}");
+                LogProblem($"usage-api HTTP {(int)resp.StatusCode}");
                 return null;
             }
             var json = await resp.Content.ReadAsStringAsync();
@@ -68,15 +86,19 @@ public class UsageApiService : IDisposable
             DateTimeOffset? oldest = null;
             string? worst = null;
             string[] rank = ["fresh", "little_stale", "stale"];
+            var stale = new List<string>();
             if (providers.ValueKind == JsonValueKind.Object)
                 foreach (var prov in providers.EnumerateObject())
                 {
                     if (prov.Value.ValueKind != JsonValueKind.Object) continue;
+                    var tier = ReadString(prov.Value, "staleness");
+                    if (tier == "stale") { stale.Add(prov.Name); continue; }
                     var at = ReadDateTimeOffset(prov.Value, "fetchedAt");
                     if (at is { } a && (oldest == null || a < oldest)) oldest = a;
-                    var tier = ReadString(prov.Value, "staleness");
                     if (tier != null && Array.IndexOf(rank, tier) > Array.IndexOf(rank, worst)) worst = tier;
                 }
+            LogProblem(stale.Count == 0 ? null : "usage-api stale providers: " + string.Join(", ", stale.Select(k =>
+                $"{k} ({ReadString(providers.GetProperty(k), "error") ?? "no error"})")));
 
             return new UsageApiStatus(
                 ts,
@@ -90,12 +112,13 @@ public class UsageApiService : IDisposable
                 ParseJev(GetData(providers, "jev")),
                 oldest,
                 worst,
-                ParseAdditionalAccounts(providers)
+                ParseAdditionalAccounts(providers),
+                stale
             );
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"usage-api error: {ex.Message}");
+            LogProblem($"usage-api error: {ex.Message}");
             return null;
         }
     }
@@ -115,7 +138,9 @@ public class UsageApiService : IDisposable
             accounts.Add(new UsageAccount(entry.Name, ReadString(metadata, "id") ?? entry.Name,
                 ReadString(metadata, "name") ?? entry.Name,
                 family == "claude" ? ParseClaude(GetData(providers, entry.Name)) : null,
-                family == "codex" ? ParseCodex(GetData(providers, entry.Name)) : null));
+                family == "codex" ? ParseCodex(GetData(providers, entry.Name)) : null,
+                ReadString(entry.Value, "staleness"), ReadDateTimeOffset(entry.Value, "fetchedAt"),
+                ReadString(entry.Value, "error")));
         }
         return accounts.OrderBy(a => a.Key.StartsWith("codex") ? 0 : 1)
             .ThenBy(a => int.Parse(a.Key[(a.Key.StartsWith("codex") ? 5 : 6)..])).ToArray();

@@ -49,8 +49,11 @@ public partial class UsagePopup
                 if (_config.ShowClaudeDesign && cc.SevenDayDesign != null) windows.Add(("Des", cc.SevenDayDesign));
             }
             if (windows.Count == 0) continue;
-            var exhausted = windows.Any(w => w.Window.UsedPercent >= 100);
-            var color = exhausted ? ExhaustedColor : Color.Parse(codex ? "#64B5F6" : "#FFB74D");
+            // usage-api keeps serving an account's last good numbers when its fetches fail;
+            // grey those out and say how old they are instead of passing them off as live.
+            var stale = account.Staleness == "stale";
+            var exhausted = !stale && windows.Any(w => w.Window.UsedPercent >= 100);
+            var color = stale ? StaleColor : exhausted ? ExhaustedColor : Color.Parse(codex ? "#64B5F6" : "#FFB74D");
             var plan = account.Codex?.PlanType ?? account.Claude?.SubscriptionType;
             var resets = account.Codex?.Resets ?? account.Claude?.Resets;
             var full = new StackPanel { Spacing = 3 };
@@ -77,6 +80,17 @@ public partial class UsagePopup
                 full.Children.Add(AccountUsageRow(name, window, color));
             }
             WireCompactRowLinks(rows, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
+            if (stale)
+            {
+                var note = "Stale since " + FormatFetchedAt(account.FetchedAt);
+                var tip = account.Error ?? "usage-api could not refresh this account";
+                var compactNote = new TextBlock { Text = label + " " + note, FontSize = 8, Foreground = new SolidColorBrush(color) };
+                var fullNote = new TextBlock { Text = note, FontSize = 8, Foreground = new SolidColorBrush(color), TextWrapping = TextWrapping.Wrap };
+                ToolTip.SetTip(compactNote, tip);
+                ToolTip.SetTip(fullNote, tip);
+                rows.Children.Add(compactNote);
+                full.Children.Add(fullNote);
+            }
             var balance = account.Codex?.CreditsBalance;
             if (decimal.TryParse(balance, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var amount))
                 balance = amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -100,6 +114,8 @@ public partial class UsagePopup
         if (AdditionalAccountsCompact.Parent is Control compactHost) compactHost.IsVisible = AdditionalAccountsCompact.Children.Count > 0;
         if (changed) AccountsChanged?.Invoke();
     }
+
+    private static readonly Color StaleColor = Color.Parse("#777777");
 
     private static Grid AccountUsageRow(string label, UsageWindow window, Color color)
     {
