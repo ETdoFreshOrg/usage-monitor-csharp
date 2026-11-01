@@ -1588,14 +1588,14 @@ public partial class UsagePopup : Window
         if (!show || c == null) return;
         SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets);
         SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets);
-        SetTwoUsedExpectedInlines(ClaudeCodeCreditsText, c.FiveHour.UsedPercent, c.FiveHour.ExpectedPercent, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
-        _claude5hUsed = c.FiveHour.UsedPercent;
+        // Claude dropped its 5-hour limit: the 5h rows stay hidden and their state stays empty.
+        SetUsedExpectedInlines(ClaudeCodeCreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        _claude5hUsed = 0;
         _claude7dUsed = c.SevenDay.UsedPercent;
-        _claude5hExpected = c.FiveHour.ExpectedPercent;
+        _claude5hExpected = null;
         _claude7dExpected = c.SevenDay.ExpectedPercent;
-        SetTargetBar(ClaudeCodePrimaryBar, _claude5hUsed, _claude5hExpected);
         SetTargetBar(ClaudeCodeSecondaryBar, _claude7dUsed, _claude7dExpected);
-        _claude5hReset = c.FiveHour.ResetsAt;
+        _claude5hReset = null;
         _claude7dReset = c.SevenDay.ResetsAt;
 
         var showDesign = c.SevenDayDesign != null && _config.ShowClaudeDesign;
@@ -1632,7 +1632,7 @@ public partial class UsagePopup : Window
             _claudeFableReset = null;
         }
 
-        var range = $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • 7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
+        var range = $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
         if (_claudeDesignUsed.HasValue)
             range += $" • Des: {_claudeDesignUsed.Value:F0}%";
         if (_claudeFableUsed.HasValue)
@@ -1669,14 +1669,13 @@ public partial class UsagePopup : Window
             ClaudeFable2Bar.IsVisible = false;
             return;
         }
-        SetTwoUsedExpectedInlines(ClaudeCode2CreditsText, c!.FiveHour.UsedPercent, c.FiveHour.ExpectedPercent, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
-        _claude2FiveHourUsed = c.FiveHour.UsedPercent;
+        SetUsedExpectedInlines(ClaudeCode2CreditsText, c!.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        _claude2FiveHourUsed = 0;
         _claude2SevenDayUsed = c.SevenDay.UsedPercent;
-        _claude2FiveHourExpected = c.FiveHour.ExpectedPercent;
+        _claude2FiveHourExpected = null;
         _claude2SevenDayExpected = c.SevenDay.ExpectedPercent;
-        SetTargetBar(ClaudeCode2PrimaryBar, _claude2FiveHourUsed, _claude2FiveHourExpected);
         SetTargetBar(ClaudeCode2SecondaryBar, _claude2SevenDayUsed, _claude2SevenDayExpected);
-        _claude2FiveHourReset = c.FiveHour.ResetsAt;
+        _claude2FiveHourReset = null;
         _claude2SevenDayReset = c.SevenDay.ResetsAt;
 
         var showDesign = c.SevenDayDesign != null && _config.ShowClaude2Design;
@@ -1713,7 +1712,7 @@ public partial class UsagePopup : Window
             _claude2FableReset = null;
         }
 
-        var range = $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • 7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
+        var range = $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
         if (_claude2DesignUsed.HasValue)
             range += $" • Des: {_claude2DesignUsed.Value:F0}%";
         if (_claude2FableUsed.HasValue)
@@ -2039,9 +2038,9 @@ public partial class UsagePopup : Window
             ("Spark 5h", _codexSpark5hReset), ("Spark 7d", _codexSpark7dReset));
         SetResetTimesTooltip(Codex2RangeText, ("5h", _codex2FiveHourReset), ("7d", _codex2SevenDayReset),
             ("Spark 5h", _codex2SparkFiveHourReset), ("Spark 7d", _codex2SparkSevenDayReset));
-        SetResetTimesTooltip(ClaudeCodeRangeText, ("5h", _claude5hReset), ("7d", _claude7dReset),
+        SetResetTimesTooltip(ClaudeCodeRangeText, ("7d", _claude7dReset),
             ("Design", _claudeDesignReset), ("Fable", _claudeFableReset));
-        SetResetTimesTooltip(ClaudeCode2RangeText, ("5h", _claude2FiveHourReset), ("7d", _claude2SevenDayReset),
+        SetResetTimesTooltip(ClaudeCode2RangeText, ("7d", _claude2SevenDayReset),
             ("Design", _claude2DesignReset), ("Fable", _claude2FableReset));
         SetResetTimesTooltip(ZaiResetText, ("5h", _zai5hReset), ("Requests", _zaiMoReset));
 

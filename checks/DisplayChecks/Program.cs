@@ -40,7 +40,7 @@ Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST),
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
- "claude12":{"account":{"id":"twelfth","name":"Twelfth Account"},"data":{"five_hour":{"utilization":2},"seven_day":{"utilization":3}}},
+ "claude12":{"account":{"id":"twelfth","name":"Twelfth Account"},"data":{"seven_day":{"utilization":3}}},
  "codex2":{"data":{"secondary":{"used_percent":1}}},"openai":{"data":{}}}
 """);
 var parsedAccounts = (IReadOnlyList<UsageMonitor.Services.UsageAccount>)typeof(UsageMonitor.Services.UsageApiService)
