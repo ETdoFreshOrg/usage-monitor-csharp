@@ -73,15 +73,19 @@ Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST),
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
- "claude12":{"account":{"id":"twelfth","name":"Twelfth Account"},"data":{"seven_day":{"utilization":3}}},
+ "claude12":{"account":{"id":"twelfth","name":"Twelfth Account"},"data":{"five_hour":null,"seven_day":{"utilization":3}}},
+ "claude13":{"account":{"id":"thirteenth","name":"Thirteenth Account"},"data":{"five_hour":{"utilization":99,"expected_percent":40,"resets_at":"2026-11-03T23:30:00Z"},"seven_day":{"utilization":73}}},
  "codex2":{"data":{"secondary":{"used_percent":1}}},"openai":{"data":{}}}
 """);
 var parsedAccounts = (IReadOnlyList<UsageMonitor.Services.UsageAccount>)typeof(UsageMonitor.Services.UsageApiService)
     .GetMethod("ParseAdditionalAccounts", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { accountJson.RootElement })!;
-Check(parsedAccounts.Count == 2, "Dynamic parser included legacy or unrelated providers");
+Check(parsedAccounts.Count == 3, "Dynamic parser included legacy or unrelated providers");
 Check(parsedAccounts[0].Id == "third" && parsedAccounts[0].Codex?.CreditsBalance == "0", "Codex #3 identity or credits missing");
 Check(parsedAccounts[1].Claude?.SevenDay.UsedPercent == 3, "Claude #12 usage missing");
-Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, legacy compatibility");
+Check(parsedAccounts[1].Claude?.FiveHour == null, "Claude #12 without a 5-hour window got one");
+Check(parsedAccounts[2].Claude?.FiveHour is { UsedPercent: 99, ExpectedPercent: 40 } fh
+      && fh.ResetsAt == DateTimeOffset.Parse("2026-11-03T23:30:00Z"), "Claude #13 5-hour window missing");
+Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Claude 5h only where reported, legacy compatibility");
 
 if (Environment.GetEnvironmentVariable("USAGE_CHECK_LIVE_URL") is { Length: > 0 } liveUrl)
 {

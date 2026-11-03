@@ -43,6 +43,7 @@ public partial class UsagePopup
             }
             if (account.Claude is { } cc)
             {
+                if (cc.FiveHour != null) windows.Add(("5h", cc.FiveHour));
                 windows.Add(("7d", cc.SevenDay));
                 if (_config.ShowClaudeFable && cc.SevenDayFable != null) windows.Add(("Fab", cc.SevenDayFable));
                 if (_config.ShowClaudeDesign && cc.SevenDayDesign != null) windows.Add(("Des", cc.SevenDayDesign));
