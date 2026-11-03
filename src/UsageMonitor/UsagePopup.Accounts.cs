@@ -57,7 +57,10 @@ public partial class UsagePopup
             var resets = account.Codex?.Resets ?? account.Claude?.Resets;
             var full = new StackPanel { Spacing = 3 };
             var title = new TextBlock { FontSize = 10, Foreground = new SolidColorBrush(color) };
-            SetTitleWithPlan(title, (codex ? "Codex #" : "Claude #") + number, plan, resets);
+            // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
+            var email = account.Name == account.Key ? null : account.Name;
+            var info = new AccountInfo(email, account.Priority);
+            SetTitleWithPlan(title, (codex ? "Codex #" : "Claude #") + number, plan, resets, info);
             ToolTip.SetTip(title, account.Name + "\n" + ResetTooltip(resets));
             full.Children.Add(title);
             MakeLink(title, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
@@ -65,9 +68,14 @@ public partial class UsagePopup
             var divider = new Border { Height = 1, Background = Brush.Parse("#2A2A2A"), Margin = new Thickness(0, 1, 0, 3) };
             DockPanel.SetDock(divider, Dock.Top);
             compact.Children.Add(divider);
+            var emailText = new TextBlock { FontSize = 7, Foreground = new SolidColorBrush(EmailColor),
+                TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 0, 1) };
+            SetCompactEmail(emailText, email);
+            DockPanel.SetDock(emailText, Dock.Top);
+            compact.Children.Add(emailText);
             var planText = new TextBlock { Width = 58, FontSize = 8, TextAlignment = TextAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6, 0, 0, 0), Foreground = Brush.Parse("#888888") };
-            SetCompactPlan(planText, plan, resets);
+            SetCompactPlan(planText, plan, resets, account.Priority);
             DockPanel.SetDock(planText, Dock.Right);
             compact.Children.Add(planText);
             var rows = new StackPanel { Spacing = 1 };

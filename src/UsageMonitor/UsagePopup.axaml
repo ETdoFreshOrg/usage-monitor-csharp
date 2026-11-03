@@ -428,6 +428,7 @@
                     </Grid>
                     <DockPanel x:Name="CodexCompactSection" LastChildFill="True">
                         <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                        <TextBlock x:Name="CodexCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
                         <TextBlock x:Name="CodexCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
                         <StackPanel Spacing="1">
                             <Grid x:Name="CodexCompact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
@@ -479,6 +480,7 @@
                     </DockPanel>
                     <DockPanel x:Name="Codex2CompactSection" LastChildFill="True" IsVisible="False">
                         <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                        <TextBlock x:Name="Codex2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
                         <TextBlock x:Name="Codex2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
                         <StackPanel Spacing="1">
                             <Grid x:Name="Codex2CompactFiveHourRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
@@ -530,6 +532,7 @@
                     </DockPanel>
                     <DockPanel x:Name="ClaudeCompactSection" LastChildFill="True">
                         <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                        <TextBlock x:Name="ClaudeCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
                         <TextBlock x:Name="ClaudeCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
                         <StackPanel Spacing="1">
                             <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
@@ -577,6 +580,7 @@
                     </DockPanel>
                     <DockPanel x:Name="Claude2CompactSection" LastChildFill="True" IsVisible="False">
                         <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                        <TextBlock x:Name="Claude2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
                         <TextBlock x:Name="Claude2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
                         <StackPanel Spacing="1">
                             <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">

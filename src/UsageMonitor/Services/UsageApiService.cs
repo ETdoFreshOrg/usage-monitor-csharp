@@ -21,7 +21,9 @@ public record JevBlock(double Spend1Day, double Spend3Days, double Spend7Days, s
 // Staleness/FetchedAt/Error come from the provider entry itself, so a card can say
 // "stale since …" when usage-api keeps serving an account's last good numbers.
 public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Claude, CodexBlock? Codex,
-    string? Staleness = null, DateTimeOffset? FetchedAt = null, string? Error = null);
+    string? Staleness = null, DateTimeOffset? FetchedAt = null, string? Error = null, double? Priority = null);
+// Who an account is: the email usage-api names it by and CLIProxyAPI's routing priority (null when unset).
+public record AccountInfo(string? Email, double? Priority);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
@@ -41,7 +43,9 @@ public record UsageApiStatus(
     // Provider keys (e.g. "claude3") whose data usage-api marks "stale". They are left
     // out of OldestFetchedAt/Staleness so one frozen account doesn't make the whole
     // footer read "Updated 30h ago"; the footer names them instead.
-    IReadOnlyList<string>? StaleProviders = null
+    IReadOnlyList<string>? StaleProviders = null,
+    // Identity of every Claude/Codex account keyed like the providers ("claude", "codex2", ...).
+    IReadOnlyDictionary<string, AccountInfo>? Accounts = null
 );
 
 public class UsageApiService : IDisposable
@@ -114,7 +118,8 @@ public class UsageApiService : IDisposable
                 oldest,
                 worst,
                 ParseAdditionalAccounts(providers),
-                stale
+                stale,
+                ParseAccountInfo(providers)
             );
         }
         catch (Exception ex)
@@ -125,6 +130,19 @@ public class UsageApiService : IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+
+    private static IReadOnlyDictionary<string, AccountInfo> ParseAccountInfo(JsonElement providers)
+    {
+        var info = new Dictionary<string, AccountInfo>();
+        if (providers.ValueKind != JsonValueKind.Object) return info;
+        foreach (var entry in providers.EnumerateObject())
+        {
+            if (entry.Value.ValueKind != JsonValueKind.Object
+                || !entry.Value.TryGetProperty("account", out var a) || a.ValueKind != JsonValueKind.Object) continue;
+            info[entry.Name] = new AccountInfo(ReadString(a, "name"), ReadDouble(a, "priority"));
+        }
+        return info;
+    }
 
     private static IReadOnlyList<UsageAccount> ParseAdditionalAccounts(JsonElement providers)
     {
@@ -141,7 +159,7 @@ public class UsageApiService : IDisposable
                 family == "claude" ? ParseClaude(GetData(providers, entry.Name)) : null,
                 family == "codex" ? ParseCodex(GetData(providers, entry.Name)) : null,
                 ReadString(entry.Value, "staleness"), ReadDateTimeOffset(entry.Value, "fetchedAt"),
-                ReadString(entry.Value, "error")));
+                ReadString(entry.Value, "error"), ReadDouble(metadata, "priority")));
         }
         return accounts.OrderBy(a => a.Key.StartsWith("codex") ? 0 : 1)
             .ThenBy(a => int.Parse(a.Key[(a.Key.StartsWith("codex") ? 5 : 6)..])).ToArray();

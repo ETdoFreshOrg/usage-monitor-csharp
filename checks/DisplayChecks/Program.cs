@@ -36,7 +36,25 @@ Call("SetResetTimesTooltip", full, new (string, DateTimeOffset?)[] { ("7d", summ
 Check((string?)ToolTip.GetTip(full) == "7d: Oct 8 8:00 PM CDT", "Reset tooltip wrong");
 Call("SetResetTimesTooltip", full, new (string, DateTimeOffset?)[] { ("7d", null) });
 Check(ToolTip.GetTip(full) == null, "Missing reset left stale tooltip");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing");
+Check((string?)Call("ShortEmail", "etdofresh@gmail.com") == "etdofresh", "Gmail domain not dropped");
+Check((string?)Call("ShortEmail", "etgarcia@my.uno.edu") == "etgarcia@my.uno.edu", "Non-Gmail domain dropped");
+Check(Call("ShortEmail", (string?)null) == null, "Missing email not null");
+Check((string?)Call("FormatPriority", (double?)10) == "P10", "Priority label wrong");
+Check(Call("FormatPriority", (double?)null) == null, "Unset priority shown");
+var plan = new TextBlock();
+Call("SetCompactPlan", plan, "max", null, (double?)9);
+Check(plan.Inlines!.Count == 2 && plan.Inlines.Text == "Max P9", $"Compact plan with priority wrong: {plan.Inlines.Text}");
+Call("SetCompactPlan", plan, "max", null, null);
+Check(plan.Inlines.Text == "Max", "Unset priority left in compact plan");
+var title = new TextBlock { FontSize = 10 };
+Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", 10));
+Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com", $"Full title wrong: {title.Inlines.Text}");
+var email = new TextBlock();
+Call("SetCompactEmail", email, "etdofresh@gmail.com");
+Check(email.IsVisible && email.Text == "etdofresh", "Compact email header wrong");
+Call("SetCompactEmail", email, (string?)null);
+Check(!email.IsVisible, "Empty compact email header still visible");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
