@@ -1393,7 +1393,7 @@ public partial class UsagePopup : Window
         _codexResets = c?.Resets;
         var codexAccount = AccountInfoFor("codex");
         SetCompactPlan(CodexCompactPlan, _codexPlan, _codexResets, codexAccount?.Priority);
-        SetCompactEmail(CodexCompactEmail, codexAccount?.Email);
+        SetCompactEmail(CodexCompactEmail, codexAccount);
         var show = c != null && _config.ShowCodex;
         CodexSection.IsVisible = show;
         ApplyCodexBalance(CodexBalanceText, CodexCompactBalanceRow, CodexCompactBalanceText, c?.CreditsBalance, "Codex CR");
@@ -1482,7 +1482,7 @@ public partial class UsagePopup : Window
         SetTitleWithPlan(CodexTitleText, show ? "Codex #1" : "Codex", _codexPlan, _codexResets, AccountInfoFor("codex"));
         SetTitleWithPlan(Codex2TitleText, "Codex #2", c?.PlanType, c?.Resets, codex2Account);
         SetCompactPlan(Codex2CompactPlan, c?.PlanType, c?.Resets, codex2Account?.Priority);
-        SetCompactEmail(Codex2CompactEmail, codex2Account?.Email);
+        SetCompactEmail(Codex2CompactEmail, codex2Account);
         CodexCompactFiveHourLabelText.Text = show ? "Codex1 5h" : "Codex 5h";
         CodexCompactSevenDayLabelText.Text = show ? "Codex1 7d" : "Codex 7d";
         CodexCompactBalanceLabel.Text = show ? "Codex1 CR" : "Codex CR";
@@ -1593,7 +1593,7 @@ public partial class UsagePopup : Window
         var claudeAccount = AccountInfoFor("claude");
         SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets, claudeAccount);
         SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets, claudeAccount?.Priority);
-        SetCompactEmail(ClaudeCompactEmail, claudeAccount?.Email);
+        SetCompactEmail(ClaudeCompactEmail, claudeAccount);
         // Claude dropped its 5-hour limit: the 5h rows stay hidden and their state stays empty.
         SetUsedExpectedInlines(ClaudeCodeCreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
         _claude5hUsed = 0;
@@ -1655,7 +1655,7 @@ public partial class UsagePopup : Window
         var claude2Account = AccountInfoFor("claude2");
         SetTitleWithPlan(ClaudeCode2TitleText, "Claude 2", c?.SubscriptionType, c?.Resets, claude2Account);
         SetCompactPlan(Claude2CompactPlan, c?.SubscriptionType, c?.Resets, claude2Account?.Priority);
-        SetCompactEmail(Claude2CompactEmail, claude2Account?.Email);
+        SetCompactEmail(Claude2CompactEmail, claude2Account);
         if (!show)
         {
             // Clear all claude2 state so the compact view never renders stale data.
@@ -2125,7 +2125,7 @@ public partial class UsagePopup : Window
     // The plan tier is metadata, not a measurement, so it trails the provider
     // name in the sub-label gray rather than competing with the percentages.
     private static void SetTitleWithPlan(TextBlock tb, string title, string? plan, ResetCredits? resets = null,
-        AccountInfo? account = null)
+        AccountInfo? account = null, DateTimeOffset? now = null)
     {
         tb.Inlines!.Clear();
         tb.Inlines.Add(new Run(title));
@@ -2150,17 +2150,57 @@ public partial class UsagePopup : Window
                 Foreground = new SolidColorBrush(PriorityColor),
                 FontSize = Math.Max(6, tb.FontSize - 2),
             });
-        if (!string.IsNullOrWhiteSpace(account?.Email))
+        var age = FormatDataAge(account?.FetchedAt, now ?? DateTimeOffset.Now);
+        if (!string.IsNullOrWhiteSpace(account?.Email) || age != null)
         {
             tb.Inlines.Add(new LineBreak());
-            tb.Inlines.Add(new Run(account.Email)
-            {
-                Foreground = new SolidColorBrush(EmailColor),
-                FontSize = Math.Max(6, tb.FontSize - 2),
-                FontWeight = FontWeight.Normal,
-            });
+            AddAccountLine(tb.Inlines, account!.Email, age, account.Staleness, Math.Max(6, tb.FontSize - 2));
         }
-        ToolTip.SetTip(tb, ResetTooltip(resets));
+        var tips = new[] { ResetTooltip(resets), DataAgeTooltip(account) }.Where(t => t != null);
+        ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
+    }
+
+    // Email, then how old the account's numbers are ("live", "4m", "1h") colored by usage-api's tier.
+    private static void AddAccountLine(Avalonia.Controls.Documents.InlineCollection inlines, string? email, string? age,
+        string? staleness, double fontSize)
+    {
+        if (!string.IsNullOrWhiteSpace(email))
+            inlines.Add(new Run(email) { Foreground = new SolidColorBrush(EmailColor), FontSize = fontSize, FontWeight = FontWeight.Normal });
+        if (age != null)
+            inlines.Add(new Run((string.IsNullOrWhiteSpace(email) ? "" : " · ") + age)
+                { Foreground = new SolidColorBrush(DataAgeColor(age, staleness)), FontSize = fontSize, FontWeight = FontWeight.Normal });
+    }
+
+    // Data younger than this reads "live": passive numbers are refreshed every ~30 s while an account is in use.
+    private static readonly TimeSpan LiveAge = TimeSpan.FromMinutes(2);
+
+    private static string? FormatDataAge(DateTimeOffset? at, DateTimeOffset now)
+    {
+        if (at is not { } t) return null;
+        var age = now - t;
+        if (age < LiveAge) return "live";
+        if (age < TimeSpan.FromHours(1)) return $"{(int)age.TotalMinutes}m";
+        if (age < TimeSpan.FromHours(48)) return $"{(int)age.TotalHours}h";
+        return $"{(int)age.TotalDays}d";
+    }
+
+    private static Color DataAgeColor(string age, string? staleness) => staleness switch
+    {
+        "stale" => Color.FromRgb(0xE5, 0x73, 0x73),
+        "little_stale" => Color.FromRgb(0xFF, 0xB7, 0x4D),
+        _ => age == "live" ? Color.FromRgb(0x81, 0xC7, 0x84) : EmailColor,
+    };
+
+    private static string? DataAgeTooltip(AccountInfo? account)
+    {
+        if (account?.FetchedAt is not { } at) return null;
+        var how = account.DataSource switch
+        {
+            "passive" => "Seen in CPA request headers",
+            "active" => "Checked with the usage endpoint",
+            _ => "Updated",
+        };
+        return $"{how} {FormatCentralTime(at)}";
     }
 
     // Which login an account is and the routing priority CLIProxyAPI gives it
@@ -2183,12 +2223,16 @@ public partial class UsagePopup : Window
         return e.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) ? e[..^"@gmail.com".Length] : e;
     }
 
-    // Small grey line heading an account's compact rows; hidden when usage-api names no account.
-    private static void SetCompactEmail(TextBlock tb, string? email)
+    // Small grey line heading an account's compact rows: short email and data age; hidden when both are unknown.
+    private static void SetCompactEmail(TextBlock tb, AccountInfo? account, DateTimeOffset? now = null)
     {
-        tb.Text = ShortEmail(email) ?? "";
-        tb.IsVisible = tb.Text.Length > 0;
-        ToolTip.SetTip(tb, string.IsNullOrWhiteSpace(email) ? null : email);
+        tb.Inlines!.Clear();
+        var age = FormatDataAge(account?.FetchedAt, now ?? DateTimeOffset.Now);
+        AddAccountLine(tb.Inlines, ShortEmail(account?.Email), age, account?.Staleness, tb.FontSize);
+        tb.IsVisible = tb.Inlines.Count > 0;
+        var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, DataAgeTooltip(account) }
+            .Where(t => t != null);
+        ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
 
     // Available limit resets (Claude "Reset for free", Codex reset credits); redeemed on the provider's site.
