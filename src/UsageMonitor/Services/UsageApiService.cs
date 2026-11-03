@@ -11,8 +11,8 @@ public record UsageWindow(
 );
 
 public record ResetCredits(int AvailableCount, DateTimeOffset? NextExpiresAt, DateTimeOffset? CheckedAt = null);
-// Claude has no 5-hour limit any more (Nov 2026), so only weekly windows are kept.
-public record ClaudeBlock(UsageWindow SevenDay, UsageWindow? SevenDayDesign, UsageWindow? SevenDayFable, string? SubscriptionType, ResetCredits? Resets);
+// FiveHour is null for accounts without a 5-hour limit (or with no open session); hide it then.
+public record ClaudeBlock(UsageWindow? FiveHour, UsageWindow SevenDay, UsageWindow? SevenDayDesign, UsageWindow? SevenDayFable, string? SubscriptionType, ResetCredits? Resets);
 public record CodexBlock(UsageWindow? Primary, UsageWindow Secondary, UsageWindow? SparkPrimary, UsageWindow? SparkSecondary, string? PlanType, string? CreditsBalance, ResetCredits? Resets);
 public record ZaiBlock(UsageWindow? FiveHour, UsageWindow? Monthly, long? MonthlyCurrent, long? MonthlyLimit, string? Level);
 public record OpenRouterBlock(double Usage, double? Limit, double? LimitRemaining, bool? IsFreeTier);
@@ -207,7 +207,13 @@ public class UsageApiService : IDisposable
         if (data.TryGetProperty("seven_day_fable", out var fab) && fab.ValueKind == JsonValueKind.Object)
             fable = ParseWindow(fab, "utilization");
 
+        // Only some Claude accounts have a 5-hour window; usage-api sends null for the rest.
+        UsageWindow? fiveHour = null;
+        if (data.TryGetProperty("five_hour", out var five) && five.ValueKind == JsonValueKind.Object)
+            fiveHour = ParseWindow(five, "utilization");
+
         return new ClaudeBlock(
+            fiveHour,
             ParseWindow(seven, "utilization"),
             design,
             fable,

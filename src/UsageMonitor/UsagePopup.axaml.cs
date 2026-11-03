@@ -113,13 +113,15 @@ public partial class UsagePopup : Window
     private ResetCredits? _codexResets;
     private double? _codex2SparkFiveHourUsed, _codex2SparkSevenDayUsed;
     private double? _codex2SparkFiveHourExpected, _codex2SparkSevenDayExpected;
-    private double _claude5hUsed, _claude7dUsed;
+    private double? _claude5hUsed;
+    private double _claude7dUsed;
     private double? _claude5hExpected, _claude7dExpected;
     private double? _claudeDesignUsed;
     private double? _claudeDesignExpected;
     private double? _claudeFableUsed;
     private double? _claudeFableExpected;
-    private double _claude2FiveHourUsed, _claude2SevenDayUsed;
+    private double? _claude2FiveHourUsed;
+    private double _claude2SevenDayUsed;
     private double? _claude2FiveHourExpected, _claude2SevenDayExpected;
     private double? _claude2DesignUsed;
     private double? _claude2DesignExpected;
@@ -1594,14 +1596,22 @@ public partial class UsagePopup : Window
         SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets, claudeAccount);
         SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets, claudeAccount?.Priority);
         SetCompactEmail(ClaudeCompactEmail, claudeAccount);
-        // Claude dropped its 5-hour limit: the 5h rows stay hidden and their state stays empty.
-        SetUsedExpectedInlines(ClaudeCodeCreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
-        _claude5hUsed = 0;
+        // Only some Claude accounts have a 5-hour limit; the 5h rows show just for those.
+        var fiveHour = c.FiveHour is { } fw ? Math.Clamp(fw.UsedPercent, 0, 100) : (double?)null;
+        if (fiveHour.HasValue)
+            SetTwoUsedExpectedInlines(ClaudeCodeCreditsText, fiveHour.Value, c.FiveHour!.ExpectedPercent, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        else
+            SetUsedExpectedInlines(ClaudeCodeCreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        _claude5hUsed = fiveHour;
         _claude7dUsed = c.SevenDay.UsedPercent;
-        _claude5hExpected = null;
+        _claude5hExpected = c.FiveHour?.ExpectedPercent;
         _claude7dExpected = c.SevenDay.ExpectedPercent;
+        ClaudeCode5hLabel.IsVisible = fiveHour.HasValue;
+        ClaudeCodePrimaryBar.IsVisible = fiveHour.HasValue;
+        if (fiveHour.HasValue)
+            SetTargetBar(ClaudeCodePrimaryBar, fiveHour.Value, _claude5hExpected);
         SetTargetBar(ClaudeCodeSecondaryBar, _claude7dUsed, _claude7dExpected);
-        _claude5hReset = null;
+        _claude5hReset = c.FiveHour?.ResetsAt;
         _claude7dReset = c.SevenDay.ResetsAt;
 
         var showDesign = c.SevenDayDesign != null && _config.ShowClaudeDesign;
@@ -1638,7 +1648,8 @@ public partial class UsagePopup : Window
             _claudeFableReset = null;
         }
 
-        var range = $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
+        var range = (c.FiveHour != null ? $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • " : "")
+            + $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
         if (_claudeDesignUsed.HasValue)
             range += $" • Des: {_claudeDesignUsed.Value:F0}%";
         if (_claudeFableUsed.HasValue)
@@ -1659,7 +1670,7 @@ public partial class UsagePopup : Window
         if (!show)
         {
             // Clear all claude2 state so the compact view never renders stale data.
-            _claude2FiveHourUsed = 0;
+            _claude2FiveHourUsed = null;
             _claude2SevenDayUsed = 0;
             _claude2FiveHourExpected = null;
             _claude2SevenDayExpected = null;
@@ -1675,15 +1686,25 @@ public partial class UsagePopup : Window
             ClaudeDesign2Bar.IsVisible = false;
             ClaudeFable2Label.IsVisible = false;
             ClaudeFable2Bar.IsVisible = false;
+            ClaudeCode25hLabel.IsVisible = false;
+            ClaudeCode2PrimaryBar.IsVisible = false;
             return;
         }
-        SetUsedExpectedInlines(ClaudeCode2CreditsText, c!.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
-        _claude2FiveHourUsed = 0;
+        var fiveHour = c!.FiveHour is { } fw ? Math.Clamp(fw.UsedPercent, 0, 100) : (double?)null;
+        if (fiveHour.HasValue)
+            SetTwoUsedExpectedInlines(ClaudeCode2CreditsText, fiveHour.Value, c.FiveHour!.ExpectedPercent, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        else
+            SetUsedExpectedInlines(ClaudeCode2CreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
+        _claude2FiveHourUsed = fiveHour;
         _claude2SevenDayUsed = c.SevenDay.UsedPercent;
-        _claude2FiveHourExpected = null;
+        _claude2FiveHourExpected = c.FiveHour?.ExpectedPercent;
         _claude2SevenDayExpected = c.SevenDay.ExpectedPercent;
+        ClaudeCode25hLabel.IsVisible = fiveHour.HasValue;
+        ClaudeCode2PrimaryBar.IsVisible = fiveHour.HasValue;
+        if (fiveHour.HasValue)
+            SetTargetBar(ClaudeCode2PrimaryBar, fiveHour.Value, _claude2FiveHourExpected);
         SetTargetBar(ClaudeCode2SecondaryBar, _claude2SevenDayUsed, _claude2SevenDayExpected);
-        _claude2FiveHourReset = null;
+        _claude2FiveHourReset = c.FiveHour?.ResetsAt;
         _claude2SevenDayReset = c.SevenDay.ResetsAt;
 
         var showDesign = c.SevenDayDesign != null && _config.ShowClaude2Design;
@@ -1720,7 +1741,8 @@ public partial class UsagePopup : Window
             _claude2FableReset = null;
         }
 
-        var range = $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
+        var range = (c.FiveHour != null ? $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • " : "")
+            + $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
         if (_claude2DesignUsed.HasValue)
             range += $" • Des: {_claude2DesignUsed.Value:F0}%";
         if (_claude2FableUsed.HasValue)
@@ -1964,11 +1986,15 @@ public partial class UsagePopup : Window
             Codex2CompactSparkSevenDayReset.Text = _codex2SparkSevenDayReset.HasValue ? FormatResetDate(_codex2SparkSevenDayReset) : "";
         }
 
-        RenderCompactBar(ClaudeCompact5hBar, ClaudeCompact5hTick, Color.FromRgb(0xFF, 0x8A, 0x65), _claude5hUsed, _claude5hExpected, barWidth, claudeOut);
+        ClaudeCompact5hRow.IsVisible = _claude5hUsed.HasValue;
+        if (_claude5hUsed.HasValue)
+        {
+            RenderCompactBar(ClaudeCompact5hBar, ClaudeCompact5hTick, Color.FromRgb(0xFF, 0x8A, 0x65), _claude5hUsed.Value, _claude5hExpected, barWidth, claudeOut);
+            SetUsedExpectedInlines(ClaudeCompact5hPct, _claude5hUsed, _claude5hExpected);
+            ClaudeCompact5hReset.Text = _claude5hReset.HasValue ? $"in {FormatResetCountdown(_claude5hReset)}" : "";
+        }
         RenderCompactBar(ClaudeCompact7dBar, ClaudeCompact7dTick, Color.FromRgb(0xFF, 0xB7, 0x4D), _claude7dUsed, _claude7dExpected, barWidth, claudeOut);
-        SetUsedExpectedInlines(ClaudeCompact5hPct, _claude5hUsed, _claude5hExpected);
         SetUsedExpectedInlines(ClaudeCompact7dPct, _claude7dUsed, _claude7dExpected);
-        ClaudeCompact5hReset.Text = _claude5hReset.HasValue ? $"in {FormatResetCountdown(_claude5hReset)}" : "";
         ClaudeCompact7dReset.Text = _claude7dReset.HasValue ? FormatResetDate(_claude7dReset) : "";
 
         ClaudeCompactDesignRow.IsVisible = _claudeDesignUsed.HasValue;
@@ -1991,13 +2017,17 @@ public partial class UsagePopup : Window
         // but keep the visibility guard for symmetry and safety.
         Claude2CompactDesignRow.IsVisible = _claude2DesignUsed.HasValue && ClaudeCode2Section.IsVisible;
         Claude2CompactFableRow.IsVisible = _claude2FableUsed.HasValue && ClaudeCode2Section.IsVisible;
+        Claude2Compact5hRow.IsVisible = _claude2FiveHourUsed.HasValue && ClaudeCode2Section.IsVisible;
         if (ClaudeCode2Section.IsVisible)
         {
-            RenderCompactBar(Claude2Compact5hBar, Claude2Compact5hTick, Color.FromRgb(0xFF, 0x8A, 0x65), _claude2FiveHourUsed, _claude2FiveHourExpected, barWidth, claude2Out);
+            if (_claude2FiveHourUsed.HasValue)
+            {
+                RenderCompactBar(Claude2Compact5hBar, Claude2Compact5hTick, Color.FromRgb(0xFF, 0x8A, 0x65), _claude2FiveHourUsed.Value, _claude2FiveHourExpected, barWidth, claude2Out);
+                SetUsedExpectedInlines(Claude2Compact5hPct, _claude2FiveHourUsed, _claude2FiveHourExpected);
+                Claude2Compact5hReset.Text = _claude2FiveHourReset.HasValue ? $"in {FormatResetCountdown(_claude2FiveHourReset)}" : "";
+            }
             RenderCompactBar(Claude2Compact7dBar, Claude2Compact7dTick, Color.FromRgb(0xFF, 0xB7, 0x4D), _claude2SevenDayUsed, _claude2SevenDayExpected, barWidth, claude2Out);
-            SetUsedExpectedInlines(Claude2Compact5hPct, _claude2FiveHourUsed, _claude2FiveHourExpected);
             SetUsedExpectedInlines(Claude2Compact7dPct, _claude2SevenDayUsed, _claude2SevenDayExpected);
-            Claude2Compact5hReset.Text = _claude2FiveHourReset.HasValue ? $"in {FormatResetCountdown(_claude2FiveHourReset)}" : "";
             Claude2Compact7dReset.Text = _claude2SevenDayReset.HasValue ? FormatResetDate(_claude2SevenDayReset) : "";
 
             if (_claude2DesignUsed.HasValue)
@@ -2046,9 +2076,9 @@ public partial class UsagePopup : Window
             ("Spark 5h", _codexSpark5hReset), ("Spark 7d", _codexSpark7dReset));
         SetResetTimesTooltip(Codex2RangeText, ("5h", _codex2FiveHourReset), ("7d", _codex2SevenDayReset),
             ("Spark 5h", _codex2SparkFiveHourReset), ("Spark 7d", _codex2SparkSevenDayReset));
-        SetResetTimesTooltip(ClaudeCodeRangeText, ("7d", _claude7dReset),
+        SetResetTimesTooltip(ClaudeCodeRangeText, ("5h", _claude5hReset), ("7d", _claude7dReset),
             ("Design", _claudeDesignReset), ("Fable", _claudeFableReset));
-        SetResetTimesTooltip(ClaudeCode2RangeText, ("7d", _claude2SevenDayReset),
+        SetResetTimesTooltip(ClaudeCode2RangeText, ("5h", _claude2FiveHourReset), ("7d", _claude2SevenDayReset),
             ("Design", _claude2DesignReset), ("Fable", _claude2FableReset));
         SetResetTimesTooltip(ZaiResetText, ("5h", _zai5hReset), ("Requests", _zaiMoReset));
 
