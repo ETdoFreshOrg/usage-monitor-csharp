@@ -1391,7 +1391,9 @@ public partial class UsagePopup : Window
         // Held for ApplyCodex2, which runs next and owns the title text.
         _codexPlan = c?.PlanType;
         _codexResets = c?.Resets;
-        SetCompactPlan(CodexCompactPlan, _codexPlan, _codexResets);
+        var codexAccount = AccountInfoFor("codex");
+        SetCompactPlan(CodexCompactPlan, _codexPlan, _codexResets, codexAccount?.Priority);
+        SetCompactEmail(CodexCompactEmail, codexAccount?.Email);
         var show = c != null && _config.ShowCodex;
         CodexSection.IsVisible = show;
         ApplyCodexBalance(CodexBalanceText, CodexCompactBalanceRow, CodexCompactBalanceText, c?.CreditsBalance, "Codex CR");
@@ -1476,9 +1478,11 @@ public partial class UsagePopup : Window
         // compact rows. The primary labels gain "1" only while account #2 is visible.
         var show = c != null && _config.ShowCodex2;
         Codex2Section.IsVisible = show;
-        SetTitleWithPlan(CodexTitleText, show ? "Codex #1" : "Codex", _codexPlan, _codexResets);
-        SetTitleWithPlan(Codex2TitleText, "Codex #2", c?.PlanType, c?.Resets);
-        SetCompactPlan(Codex2CompactPlan, c?.PlanType, c?.Resets);
+        var codex2Account = AccountInfoFor("codex2");
+        SetTitleWithPlan(CodexTitleText, show ? "Codex #1" : "Codex", _codexPlan, _codexResets, AccountInfoFor("codex"));
+        SetTitleWithPlan(Codex2TitleText, "Codex #2", c?.PlanType, c?.Resets, codex2Account);
+        SetCompactPlan(Codex2CompactPlan, c?.PlanType, c?.Resets, codex2Account?.Priority);
+        SetCompactEmail(Codex2CompactEmail, codex2Account?.Email);
         CodexCompactFiveHourLabelText.Text = show ? "Codex1 5h" : "Codex 5h";
         CodexCompactSevenDayLabelText.Text = show ? "Codex1 7d" : "Codex 7d";
         CodexCompactBalanceLabel.Text = show ? "Codex1 CR" : "Codex CR";
@@ -1586,8 +1590,10 @@ public partial class UsagePopup : Window
         var show = c != null && _config.ShowClaude;
         ClaudeCodeSection.IsVisible = show;
         if (!show || c == null) return;
-        SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets);
-        SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets);
+        var claudeAccount = AccountInfoFor("claude");
+        SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets, claudeAccount);
+        SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets, claudeAccount?.Priority);
+        SetCompactEmail(ClaudeCompactEmail, claudeAccount?.Email);
         // Claude dropped its 5-hour limit: the 5h rows stay hidden and their state stays empty.
         SetUsedExpectedInlines(ClaudeCodeCreditsText, c.SevenDay.UsedPercent, c.SevenDay.ExpectedPercent);
         _claude5hUsed = 0;
@@ -1646,8 +1652,10 @@ public partial class UsagePopup : Window
         // providers.claude2 AND the local config flag approves it.
         var show = c != null && _config.ShowClaude2;
         ClaudeCode2Section.IsVisible = show;
-        SetTitleWithPlan(ClaudeCode2TitleText, "Claude 2", c?.SubscriptionType, c?.Resets);
-        SetCompactPlan(Claude2CompactPlan, c?.SubscriptionType, c?.Resets);
+        var claude2Account = AccountInfoFor("claude2");
+        SetTitleWithPlan(ClaudeCode2TitleText, "Claude 2", c?.SubscriptionType, c?.Resets, claude2Account);
+        SetCompactPlan(Claude2CompactPlan, c?.SubscriptionType, c?.Resets, claude2Account?.Priority);
+        SetCompactEmail(Claude2CompactEmail, claude2Account?.Email);
         if (!show)
         {
             // Clear all claude2 state so the compact view never renders stale data.
@@ -2116,7 +2124,8 @@ public partial class UsagePopup : Window
 
     // The plan tier is metadata, not a measurement, so it trails the provider
     // name in the sub-label gray rather than competing with the percentages.
-    private static void SetTitleWithPlan(TextBlock tb, string title, string? plan, ResetCredits? resets = null)
+    private static void SetTitleWithPlan(TextBlock tb, string title, string? plan, ResetCredits? resets = null,
+        AccountInfo? account = null)
     {
         tb.Inlines!.Clear();
         tb.Inlines.Add(new Run(title));
@@ -2134,7 +2143,52 @@ public partial class UsagePopup : Window
                 Foreground = new SolidColorBrush(ResetBadgeColor),
                 FontSize = Math.Max(6, tb.FontSize - 2),
             });
+        var priority = FormatPriority(account?.Priority);
+        if (priority != null)
+            tb.Inlines.Add(new Run($"  {priority}")
+            {
+                Foreground = new SolidColorBrush(PriorityColor),
+                FontSize = Math.Max(6, tb.FontSize - 2),
+            });
+        if (!string.IsNullOrWhiteSpace(account?.Email))
+        {
+            tb.Inlines.Add(new LineBreak());
+            tb.Inlines.Add(new Run(account.Email)
+            {
+                Foreground = new SolidColorBrush(EmailColor),
+                FontSize = Math.Max(6, tb.FontSize - 2),
+                FontWeight = FontWeight.Normal,
+            });
+        }
         ToolTip.SetTip(tb, ResetTooltip(resets));
+    }
+
+    // Which login an account is and the routing priority CLIProxyAPI gives it
+    // ("P10"), so the monitor's rows can be matched to the CPA dashboard cards.
+    private static readonly Color PriorityColor = Color.FromRgb(0xB3, 0x9D, 0xDB);
+    private static readonly Color EmailColor = Color.FromRgb(0x77, 0x77, 0x77);
+
+    private AccountInfo? AccountInfoFor(string key) =>
+        _lastStatus?.Accounts is { } accounts && accounts.TryGetValue(key, out var info) ? info : null;
+
+    private static string? FormatPriority(double? priority) =>
+        priority is { } p ? "P" + p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    // Gmail is the common case, so its domain is dropped; other domains stay so
+    // etgarcia@uno.edu and etgarcia@my.uno.edu remain distinguishable.
+    private static string? ShortEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+        var e = email.Trim();
+        return e.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase) ? e[..^"@gmail.com".Length] : e;
+    }
+
+    // Small grey line heading an account's compact rows; hidden when usage-api names no account.
+    private static void SetCompactEmail(TextBlock tb, string? email)
+    {
+        tb.Text = ShortEmail(email) ?? "";
+        tb.IsVisible = tb.Text.Length > 0;
+        ToolTip.SetTip(tb, string.IsNullOrWhiteSpace(email) ? null : email);
     }
 
     // Available limit resets (Claude "Reset for free", Codex reset credits); redeemed on the provider's site.
@@ -2153,13 +2207,18 @@ public partial class UsagePopup : Window
     }
 
     // Compact plan column: reset badge to the right of the plan.
-    private static void SetCompactPlan(TextBlock tb, string? plan, ResetCredits? resets)
+    // Priority follows; the column wraps rather than clipping when all three don't fit.
+    private static void SetCompactPlan(TextBlock tb, string? plan, ResetCredits? resets, double? priority = null)
     {
+        tb.TextWrapping = TextWrapping.Wrap;
         tb.Inlines!.Clear();
         tb.Inlines.Add(new Run(FormatPlan(plan) ?? ""));
         var badge = ResetBadge(resets);
         if (badge != null)
             tb.Inlines.Add(new Run($" {badge}") { Foreground = new SolidColorBrush(ResetBadgeColor) });
+        var p = FormatPriority(priority);
+        if (p != null)
+            tb.Inlines.Add(new Run($" {p}") { Foreground = new SolidColorBrush(PriorityColor) });
         ToolTip.SetTip(tb, ResetTooltip(resets));
     }
 
