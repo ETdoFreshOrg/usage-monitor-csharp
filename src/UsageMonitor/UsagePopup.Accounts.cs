@@ -59,9 +59,10 @@ public partial class UsagePopup
             var title = new TextBlock { FontSize = 10, Foreground = new SolidColorBrush(color) };
             // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
             var email = account.Name == account.Key ? null : account.Name;
-            var info = new AccountInfo(email, account.Priority);
+            var info = AccountInfoFor(account.Key) is { } known ? known with { Email = email }
+                : new AccountInfo(email, account.Priority, account.FetchedAt, null, account.Staleness);
             SetTitleWithPlan(title, (codex ? "Codex #" : "Claude #") + number, plan, resets, info);
-            ToolTip.SetTip(title, account.Name + "\n" + ResetTooltip(resets));
+            ToolTip.SetTip(title, string.Join("\n", new[] { account.Name, ResetTooltip(resets), DataAgeTooltip(info) }.Where(t => t != null)));
             full.Children.Add(title);
             MakeLink(title, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
             var compact = new DockPanel { LastChildFill = true };
@@ -70,7 +71,7 @@ public partial class UsagePopup
             compact.Children.Add(divider);
             var emailText = new TextBlock { FontSize = 7, Foreground = new SolidColorBrush(EmailColor),
                 TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 0, 1) };
-            SetCompactEmail(emailText, email);
+            SetCompactEmail(emailText, info);
             DockPanel.SetDock(emailText, Dock.Top);
             compact.Children.Add(emailText);
             var planText = new TextBlock { Width = 58, FontSize = 8, TextAlignment = TextAlignment.Right,

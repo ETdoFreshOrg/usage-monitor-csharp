@@ -22,8 +22,11 @@ public record JevBlock(double Spend1Day, double Spend3Days, double Spend7Days, s
 // "stale since …" when usage-api keeps serving an account's last good numbers.
 public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Claude, CodexBlock? Codex,
     string? Staleness = null, DateTimeOffset? FetchedAt = null, string? Error = null, double? Priority = null);
-// Who an account is: the email usage-api names it by and CLIProxyAPI's routing priority (null when unset).
-public record AccountInfo(string? Email, double? Priority);
+// Who an account is: the email usage-api names it by and CLIProxyAPI's routing priority (null when unset),
+// plus how current its numbers are: FetchedAt is when they were true, DataSource is "passive" (seen in
+// CPA request headers) or "active" (usage-endpoint check), Staleness is usage-api's tier for them.
+public record AccountInfo(string? Email, double? Priority, DateTimeOffset? FetchedAt = null,
+    string? DataSource = null, string? Staleness = null);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
@@ -98,6 +101,9 @@ public class UsageApiService : IDisposable
                     if (prov.Value.ValueKind != JsonValueKind.Object) continue;
                     var tier = ReadString(prov.Value, "staleness");
                     if (tier == "stale") { stale.Add(prov.Name); continue; }
+                    // Claude/Codex accounts show their own data age per group, and their slow backup
+                    // checks would otherwise make the footer read "Updated 25m ago" most of the time.
+                    if (prov.Value.TryGetProperty("account", out var acct) && acct.ValueKind == JsonValueKind.Object) continue;
                     var at = ReadDateTimeOffset(prov.Value, "fetchedAt");
                     if (at is { } a && (oldest == null || a < oldest)) oldest = a;
                     if (tier != null && Array.IndexOf(rank, tier) > Array.IndexOf(rank, worst)) worst = tier;
@@ -139,7 +145,9 @@ public class UsageApiService : IDisposable
         {
             if (entry.Value.ValueKind != JsonValueKind.Object
                 || !entry.Value.TryGetProperty("account", out var a) || a.ValueKind != JsonValueKind.Object) continue;
-            info[entry.Name] = new AccountInfo(ReadString(a, "name"), ReadDouble(a, "priority"));
+            info[entry.Name] = new AccountInfo(ReadString(a, "name"), ReadDouble(a, "priority"),
+                ReadDateTimeOffset(entry.Value, "fetchedAt"), ReadString(entry.Value, "dataSource"),
+                ReadString(entry.Value, "staleness"));
         }
         return info;
     }

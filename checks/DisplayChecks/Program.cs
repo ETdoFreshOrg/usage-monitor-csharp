@@ -47,14 +47,29 @@ Check(plan.Inlines!.Count == 2 && plan.Inlines.Text == "Max P9", $"Compact plan 
 Call("SetCompactPlan", plan, "max", null, null);
 Check(plan.Inlines.Text == "Max", "Unset priority left in compact plan");
 var title = new TextBlock { FontSize = 10 };
-Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", 10));
+var now = DateTimeOffset.Parse("2026-11-03T20:00:00Z");
+Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", 10), now);
 Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com", $"Full title wrong: {title.Inlines.Text}");
-var email = new TextBlock();
-Call("SetCompactEmail", email, "etdofresh@gmail.com");
-Check(email.IsVisible && email.Text == "etdofresh", "Compact email header wrong");
-Call("SetCompactEmail", email, (string?)null);
+Call("SetTitleWithPlan", title, "Claude", "Max 20x", null,
+    new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", 10, now.AddSeconds(-40), "passive", "fresh"), now);
+Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com · live", $"Full title age wrong: {title.Inlines.Text}");
+var email = new TextBlock { FontSize = 7 };
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", null), now);
+Check(email.IsVisible && email.Inlines!.Text == "etdofresh", $"Compact email header wrong: {email.Inlines?.Text}");
+Call("SetCompactEmail", email, null, now);
 Check(!email.IsVisible, "Empty compact email header still visible");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority");
+foreach (var (ago, expected) in new[] { (TimeSpan.FromSeconds(90), "live"), (TimeSpan.FromMinutes(4.5), "4m"),
+             (TimeSpan.FromMinutes(75), "1h"), (TimeSpan.FromDays(3), "3d") })
+{
+    Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now - ago, "active", "fresh"), now);
+    Check(email.Inlines!.Text == $"a@uno.edu · {expected}", $"Data age for {ago} wrong: {email.Inlines.Text}");
+}
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo(null, null, now.AddMinutes(-50), "active", "little_stale"), now);
+Check(email.IsVisible && email.Inlines!.Text == "50m", "Age without email wrong");
+Check(((Avalonia.Controls.Documents.Run)email.Inlines![0]).Foreground is Avalonia.Media.SolidColorBrush { Color: var c } && c.R == 0xFF,
+    "Little-stale age not amber");
+Check(((string?)ToolTip.GetTip(email))!.StartsWith("Checked with the usage endpoint"), "Age tooltip missing source");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority/data age");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
