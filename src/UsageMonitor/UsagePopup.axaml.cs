@@ -91,9 +91,9 @@ public partial class UsagePopup : Window
     public IReadOnlyList<DriveToggle> DriveToggles { get; private set; } = Array.Empty<DriveToggle>();
 
     // Latest reset timestamps (driven by RefreshXxxAsync, read by UpdateCompactSummary)
-    private DateTimeOffset? _codex5hReset, _codex7dReset;
+    private DateTimeOffset? _codex5hReset, _codex24hReset, _codex7dReset;
     private DateTimeOffset? _codexSpark5hReset, _codexSpark7dReset;
-    private DateTimeOffset? _codex2FiveHourReset, _codex2SevenDayReset;
+    private DateTimeOffset? _codex2FiveHourReset, _codex2OneDayReset, _codex2SevenDayReset;
     private DateTimeOffset? _codex2SparkFiveHourReset, _codex2SparkSevenDayReset;
     private DateTimeOffset? _claude5hReset, _claude7dReset, _claudeDesignReset, _claudeFableReset;
     private DateTimeOffset? _claude2FiveHourReset, _claude2SevenDayReset, _claude2DesignReset, _claude2FableReset;
@@ -101,14 +101,13 @@ public partial class UsagePopup : Window
     private double? _zai5hPercent, _zaiMoPercent;
 
     // Latest used/expected percent per AI window, used for compact-view rendering.
-    private double? _codex5hUsed;
-    private double _codex7dUsed;
-    private double? _codex5hExpected, _codex7dExpected;
+    // Codex windows are each optional (null = not reported, e.g. promax has no 5-hour window).
+    private double? _codex5hUsed, _codex24hUsed, _codex7dUsed;
+    private double? _codex5hExpected, _codex24hExpected, _codex7dExpected;
     private double? _codexSpark5hUsed, _codexSpark7dUsed;
     private double? _codexSpark5hExpected, _codexSpark7dExpected;
-    private double? _codex2FiveHourUsed;
-    private double _codex2SevenDayUsed;
-    private double? _codex2FiveHourExpected, _codex2SevenDayExpected;
+    private double? _codex2FiveHourUsed, _codex2OneDayUsed, _codex2SevenDayUsed;
+    private double? _codex2FiveHourExpected, _codex2OneDayExpected, _codex2SevenDayExpected;
     private string? _codexPlan;
     private ResetCredits? _codexResets;
     private double? _codex2SparkFiveHourUsed, _codex2SparkSevenDayUsed;
@@ -229,10 +228,12 @@ public partial class UsagePopup : Window
 
         // Register target-aware bars so they re-render on resize.
         RegisterTargetBar(CodexPrimaryBar, CodexPrimaryBarFill, CodexPrimaryBarTick, Color.FromRgb(0x8B, 0xC3, 0x4A));
+        RegisterTargetBar(CodexDailyBar, CodexDailyBarFill, CodexDailyBarTick, Color.FromRgb(0xCD, 0xDC, 0x39));
         RegisterTargetBar(CodexSecondaryBar, CodexSecondaryBarFill, CodexSecondaryBarTick, Color.FromRgb(0xB3, 0x9D, 0xDB));
         RegisterTargetBar(CodexSparkPrimaryBar, CodexSparkPrimaryBarFill, CodexSparkPrimaryBarTick, Color.FromRgb(0x4D, 0xD0, 0xE1));
         RegisterTargetBar(CodexSparkSecondaryBar, CodexSparkSecondaryBarFill, CodexSparkSecondaryBarTick, Color.FromRgb(0x4D, 0xB6, 0xAC));
         RegisterTargetBar(Codex2PrimaryBar, Codex2PrimaryBarFill, Codex2PrimaryBarTick, Color.FromRgb(0x64, 0xB5, 0xF6));
+        RegisterTargetBar(Codex2DailyBar, Codex2DailyBarFill, Codex2DailyBarTick, Color.FromRgb(0x4F, 0xC3, 0xF7));
         RegisterTargetBar(Codex2SecondaryBar, Codex2SecondaryBarFill, Codex2SecondaryBarTick, Color.FromRgb(0x90, 0xCA, 0xF9));
         RegisterTargetBar(Codex2SparkPrimaryBar, Codex2SparkPrimaryBarFill, Codex2SparkPrimaryBarTick, Color.FromRgb(0x95, 0x75, 0xCD));
         RegisterTargetBar(Codex2SparkSecondaryBar, Codex2SparkSecondaryBarFill, Codex2SparkSecondaryBarTick, Color.FromRgb(0xB3, 0x9D, 0xDB));
@@ -1401,28 +1402,10 @@ public partial class UsagePopup : Window
         CodexSection.IsVisible = show;
         ApplyCodexBalance(CodexBalanceText, CodexCompactBalanceRow, CodexCompactBalanceText, c?.CreditsBalance, "Codex CR");
         if (!show || c == null) return;
-        var primary = c.Primary is { } primaryWindow
-            ? Math.Clamp(primaryWindow.UsedPercent, 0, 100)
-            : (double?)null;
-        var secondary = Math.Clamp(c.Secondary.UsedPercent, 0, 100);
-        if (primary.HasValue)
-            SetTwoUsedExpectedInlines(CodexCreditsText, primary.Value, c.Primary!.ExpectedPercent, secondary, c.Secondary.ExpectedPercent);
-        else
-        {
-            SetUsedExpectedInlines(CodexCreditsText, secondary, c.Secondary.ExpectedPercent);
-            CodexCreditsText.Inlines!.Add(new Run(" used"));
-        }
-        _codex5hUsed = primary;
-        _codex7dUsed = secondary;
-        _codex5hExpected = c.Primary?.ExpectedPercent;
-        _codex7dExpected = c.Secondary.ExpectedPercent;
-        Codex5hLabel.IsVisible = primary.HasValue;
-        CodexPrimaryBar.IsVisible = primary.HasValue;
-        if (primary.HasValue)
-            SetTargetBar(CodexPrimaryBar, primary.Value, _codex5hExpected);
-        SetTargetBar(CodexSecondaryBar, secondary, _codex7dExpected);
-        _codex5hReset = c.Primary?.ResetsAt;
-        _codex7dReset = c.Secondary.ResetsAt;
+        SetCodexHeaderText(CodexCreditsText, c);
+        (_codex5hUsed, _codex5hExpected, _codex5hReset) = ShowCodexWindow(c.Primary, Codex5hLabel, CodexPrimaryBar);
+        (_codex24hUsed, _codex24hExpected, _codex24hReset) = ShowCodexWindow(c.OneDay, Codex24hLabel, CodexDailyBar);
+        (_codex7dUsed, _codex7dExpected, _codex7dReset) = ShowCodexWindow(c.Secondary, Codex7dLabel, CodexSecondaryBar);
 
         // Spark (GPT-5.3-Codex-Spark) optional bars, gated by the Codex Spark toggle.
         var showSpark5h = c.SparkPrimary != null && _config.ShowCodexSpark;
@@ -1460,9 +1443,7 @@ public partial class UsagePopup : Window
             _codexSpark7dReset = null;
         }
 
-        var range = primary.HasValue
-            ? $"5h: in {FormatResetCountdown(c.Primary!.ResetsAt)} • 7d: {FormatResetDate(c.Secondary.ResetsAt)}"
-            : $"7d: {FormatResetDate(c.Secondary.ResetsAt)}";
+        var range = CodexResetSummary(c);
         if (showSpark5h || showSpark7d)
         {
             var sparkPct = _codexSpark5hUsed.HasValue && _codexSpark7dUsed.HasValue
@@ -1470,9 +1451,48 @@ public partial class UsagePopup : Window
                 : _codexSpark5hUsed.HasValue
                     ? $"{_codexSpark5hUsed.Value:F0}%"
                     : $"{_codexSpark7dUsed!.Value:F0}%";
-            range += $" • Spark: {sparkPct}";
+            range += (range.Length > 0 ? " • " : "") + $"Spark: {sparkPct}";
         }
         CodexRangeText.Text = range;
+    }
+
+    // The account-wide Codex windows OpenAI reports, shortest first, labelled by length. Any can be
+    // missing, including the weekly one: an account is never hidden for lacking a particular window.
+    internal static IEnumerable<(string Label, UsageWindow Window)> CodexAccountWindows(CodexBlock? c)
+    {
+        if (c?.Primary is { } five) yield return ("5h", five);
+        if (c?.OneDay is { } day) yield return ("24h", day);
+        if (c?.Secondary is { } week) yield return ("7d", week);
+    }
+
+    // Header percentages: shortest and longest window ("5% / 40% used"), or the only one ("12% used").
+    private static void SetCodexHeaderText(TextBlock tb, CodexBlock c)
+    {
+        var windows = CodexAccountWindows(c).Select(w => w.Window).ToList();
+        if (windows.Count >= 2)
+            SetTwoUsedExpectedInlines(tb, Math.Clamp(windows[0].UsedPercent, 0, 100), windows[0].ExpectedPercent,
+                Math.Clamp(windows[^1].UsedPercent, 0, 100), windows[^1].ExpectedPercent);
+        else
+        {
+            SetUsedExpectedInlines(tb, windows.Count == 1 ? Math.Clamp(windows[0].UsedPercent, 0, 100) : null, windows.FirstOrDefault()?.ExpectedPercent);
+            tb.Inlines!.Add(new Run(" used"));
+        }
+    }
+
+    // "5h: in 3h 10m • 24h: in 20h 4m • 7d: Wed Nov 5": countdowns for the windows that reset within a day or so.
+    internal static string CodexResetSummary(CodexBlock c) => string.Join(" • ", CodexAccountWindows(c).Select(w =>
+        w.Label == "7d" ? $"7d: {FormatResetDate(w.Window.ResetsAt)}" : $"{w.Label}: in {FormatResetCountdown(w.Window.ResetsAt)}"));
+
+    // Shows one full-view window row (label + bar) when the window is reported, hides it otherwise,
+    // and returns what the compact view needs.
+    private (double? Used, double? Expected, DateTimeOffset? Reset) ShowCodexWindow(UsageWindow? w, TextBlock label, Grid bar)
+    {
+        label.IsVisible = w != null;
+        bar.IsVisible = w != null;
+        if (w == null) return (null, null, null);
+        var used = Math.Clamp(w.UsedPercent, 0, 100);
+        SetTargetBar(bar, used, w.ExpectedPercent);
+        return (used, w.ExpectedPercent, w.ResetsAt);
     }
 
     private void ApplyCodex2(CodexBlock? c)
@@ -1487,26 +1507,22 @@ public partial class UsagePopup : Window
         SetCompactPlan(Codex2CompactPlan, c?.PlanType, c?.Resets, codex2Account?.Priority);
         SetCompactEmail(Codex2CompactEmail, codex2Account);
         CodexCompactFiveHourLabelText.Text = show ? "Codex1 5h" : "Codex 5h";
+        CodexCompactOneDayLabelText.Text = show ? "Codex1 24h" : "Codex 24h";
         CodexCompactSevenDayLabelText.Text = show ? "Codex1 7d" : "Codex 7d";
         CodexCompactBalanceLabel.Text = show ? "Codex1 CR" : "Codex CR";
         ApplyCodexBalance(Codex2BalanceText, Codex2CompactBalanceRow, Codex2CompactBalanceText, c?.CreditsBalance, "Codex2 CR");
 
         if (!show || c == null)
         {
-            _codex2FiveHourUsed = null;
-            _codex2SevenDayUsed = 0;
-            _codex2FiveHourExpected = null;
-            _codex2SevenDayExpected = null;
-            _codex2FiveHourReset = null;
-            _codex2SevenDayReset = null;
+            (_codex2FiveHourUsed, _codex2FiveHourExpected, _codex2FiveHourReset) = ShowCodexWindow(null, Codex2FiveHourLabel, Codex2PrimaryBar);
+            (_codex2OneDayUsed, _codex2OneDayExpected, _codex2OneDayReset) = ShowCodexWindow(null, Codex2OneDayLabel, Codex2DailyBar);
+            (_codex2SevenDayUsed, _codex2SevenDayExpected, _codex2SevenDayReset) = ShowCodexWindow(null, Codex2SevenDayLabel, Codex2SecondaryBar);
             _codex2SparkFiveHourUsed = null;
             _codex2SparkSevenDayUsed = null;
             _codex2SparkFiveHourExpected = null;
             _codex2SparkSevenDayExpected = null;
             _codex2SparkFiveHourReset = null;
             _codex2SparkSevenDayReset = null;
-            Codex2FiveHourLabel.IsVisible = false;
-            Codex2PrimaryBar.IsVisible = false;
             Codex2SparkFiveHourLabel.IsVisible = false;
             Codex2SparkPrimaryBar.IsVisible = false;
             Codex2SparkSevenDayLabel.IsVisible = false;
@@ -1514,29 +1530,10 @@ public partial class UsagePopup : Window
             return;
         }
 
-        var fiveHour = c.Primary is { } primaryWindow
-            ? Math.Clamp(primaryWindow.UsedPercent, 0, 100)
-            : (double?)null;
-        var sevenDay = Math.Clamp(c.Secondary.UsedPercent, 0, 100);
-        if (fiveHour.HasValue)
-            SetTwoUsedExpectedInlines(Codex2CreditsText, fiveHour.Value, c.Primary!.ExpectedPercent, sevenDay, c.Secondary.ExpectedPercent);
-        else
-        {
-            SetUsedExpectedInlines(Codex2CreditsText, sevenDay, c.Secondary.ExpectedPercent);
-            Codex2CreditsText.Inlines!.Add(new Run(" used"));
-        }
-
-        _codex2FiveHourUsed = fiveHour;
-        _codex2SevenDayUsed = sevenDay;
-        _codex2FiveHourExpected = c.Primary?.ExpectedPercent;
-        _codex2SevenDayExpected = c.Secondary.ExpectedPercent;
-        _codex2FiveHourReset = c.Primary?.ResetsAt;
-        _codex2SevenDayReset = c.Secondary.ResetsAt;
-        Codex2FiveHourLabel.IsVisible = fiveHour.HasValue;
-        Codex2PrimaryBar.IsVisible = fiveHour.HasValue;
-        if (fiveHour.HasValue)
-            SetTargetBar(Codex2PrimaryBar, fiveHour.Value, _codex2FiveHourExpected);
-        SetTargetBar(Codex2SecondaryBar, sevenDay, _codex2SevenDayExpected);
+        SetCodexHeaderText(Codex2CreditsText, c);
+        (_codex2FiveHourUsed, _codex2FiveHourExpected, _codex2FiveHourReset) = ShowCodexWindow(c.Primary, Codex2FiveHourLabel, Codex2PrimaryBar);
+        (_codex2OneDayUsed, _codex2OneDayExpected, _codex2OneDayReset) = ShowCodexWindow(c.OneDay, Codex2OneDayLabel, Codex2DailyBar);
+        (_codex2SevenDayUsed, _codex2SevenDayExpected, _codex2SevenDayReset) = ShowCodexWindow(c.Secondary, Codex2SevenDayLabel, Codex2SecondaryBar);
 
         var showSparkFiveHour = c.SparkPrimary != null && _config.ShowCodexSpark;
         var showSparkSevenDay = c.SparkSecondary != null && _config.ShowCodexSpark;
@@ -1573,9 +1570,7 @@ public partial class UsagePopup : Window
             _codex2SparkSevenDayReset = null;
         }
 
-        var range = fiveHour.HasValue
-            ? $"5h: in {FormatResetCountdown(c.Primary!.ResetsAt)} • 7d: {FormatResetDate(c.Secondary.ResetsAt)}"
-            : $"7d: {FormatResetDate(c.Secondary.ResetsAt)}";
+        var range = CodexResetSummary(c);
         if (showSparkFiveHour || showSparkSevenDay)
         {
             var sparkPercent = _codex2SparkFiveHourUsed.HasValue && _codex2SparkSevenDayUsed.HasValue
@@ -1583,7 +1578,7 @@ public partial class UsagePopup : Window
                 : _codex2SparkFiveHourUsed.HasValue
                     ? $"{_codex2SparkFiveHourUsed.Value:F0}%"
                     : $"{_codex2SparkSevenDayUsed!.Value:F0}%";
-            range += $" • Spark: {sparkPercent}";
+            range += (range.Length > 0 ? " • " : "") + $"Spark: {sparkPercent}";
         }
         Codex2RangeText.Text = range;
     }
@@ -1882,9 +1877,9 @@ public partial class UsagePopup : Window
         // Exhausted limits grey out: an account-wide window (5h/7d) greys every bar of
         // that account; a model-scoped window (Spark, Design, Fable) greys only its own.
         static bool Full(double? v) => v >= 99.5;
-        var codexOut = Full(_codex5hUsed) || Full(_codex7dUsed);
+        var codexOut = Full(_codex5hUsed) || Full(_codex24hUsed) || Full(_codex7dUsed);
         var codexSparkOut = codexOut || Full(_codexSpark5hUsed) || Full(_codexSpark7dUsed);
-        var codex2Out = Full(_codex2FiveHourUsed) || Full(_codex2SevenDayUsed);
+        var codex2Out = Full(_codex2FiveHourUsed) || Full(_codex2OneDayUsed) || Full(_codex2SevenDayUsed);
         var codex2SparkOut = codex2Out || Full(_codex2SparkFiveHourUsed) || Full(_codex2SparkSevenDayUsed);
         var claudeOut = Full(_claude5hUsed) || Full(_claude7dUsed);
         var claudeDesignOut = claudeOut || Full(_claudeDesignUsed);
@@ -1894,9 +1889,9 @@ public partial class UsagePopup : Window
         var claude2FableOut = claude2Out || Full(_claude2FableUsed);
         var zaiOut = Full(_zai5hPercent);
         var zaiMoOut = zaiOut || Full(_zaiMoPercent);
-        SetTargetBarsExhausted(codexOut, CodexPrimaryBar, CodexSecondaryBar);
+        SetTargetBarsExhausted(codexOut, CodexPrimaryBar, CodexDailyBar, CodexSecondaryBar);
         SetTargetBarsExhausted(codexSparkOut, CodexSparkPrimaryBar, CodexSparkSecondaryBar);
-        SetTargetBarsExhausted(codex2Out, Codex2PrimaryBar, Codex2SecondaryBar);
+        SetTargetBarsExhausted(codex2Out, Codex2PrimaryBar, Codex2DailyBar, Codex2SecondaryBar);
         SetTargetBarsExhausted(codex2SparkOut, Codex2SparkPrimaryBar, Codex2SparkSecondaryBar);
         SetTargetBarsExhausted(claudeOut, ClaudeCodePrimaryBar, ClaudeCodeSecondaryBar);
         SetTargetBarsExhausted(claudeDesignOut, ClaudeDesignBar);
@@ -1935,12 +1930,24 @@ public partial class UsagePopup : Window
         const double barWidth = 62.0;
         CodexCompact5hRow.IsVisible = _codex5hUsed.HasValue;
         if (_codex5hUsed.HasValue)
+        {
             RenderCompactBar(CodexCompact5hBar, CodexCompact5hTick, Color.FromRgb(0x8B, 0xC3, 0x4A), _codex5hUsed.Value, _codex5hExpected, barWidth, codexOut);
-        RenderCompactBar(CodexCompact7dBar, CodexCompact7dTick, Color.FromRgb(0xB3, 0x9D, 0xDB), _codex7dUsed, _codex7dExpected, barWidth, codexOut);
-        if (_codex5hUsed.HasValue)
             SetUsedExpectedInlines(CodexCompact5hPct, _codex5hUsed, _codex5hExpected);
-        SetUsedExpectedInlines(CodexCompact7dPct, _codex7dUsed, _codex7dExpected);
+        }
+        CodexCompact24hRow.IsVisible = _codex24hUsed.HasValue;
+        if (_codex24hUsed.HasValue)
+        {
+            RenderCompactBar(CodexCompact24hBar, CodexCompact24hTick, Color.FromRgb(0xCD, 0xDC, 0x39), _codex24hUsed.Value, _codex24hExpected, barWidth, codexOut);
+            SetUsedExpectedInlines(CodexCompact24hPct, _codex24hUsed, _codex24hExpected);
+        }
+        CodexCompact7dRow.IsVisible = _codex7dUsed.HasValue;
+        if (_codex7dUsed.HasValue)
+        {
+            RenderCompactBar(CodexCompact7dBar, CodexCompact7dTick, Color.FromRgb(0xB3, 0x9D, 0xDB), _codex7dUsed.Value, _codex7dExpected, barWidth, codexOut);
+            SetUsedExpectedInlines(CodexCompact7dPct, _codex7dUsed, _codex7dExpected);
+        }
         CodexCompact5hReset.Text = _codex5hReset.HasValue ? $"in {FormatResetCountdown(_codex5hReset)}" : "";
+        CodexCompact24hReset.Text = _codex24hReset.HasValue ? $"in {FormatResetCountdown(_codex24hReset)}" : "";
         CodexCompact7dReset.Text = _codex7dReset.HasValue ? FormatResetDate(_codex7dReset) : "";
 
         CodexCompactSpark5hRow.IsVisible = _codexSpark5hUsed.HasValue;
@@ -1959,6 +1966,8 @@ public partial class UsagePopup : Window
         }
 
         Codex2CompactFiveHourRow.IsVisible = _codex2FiveHourUsed.HasValue;
+        Codex2CompactOneDayRow.IsVisible = _codex2OneDayUsed.HasValue;
+        Codex2CompactSevenDayRow.IsVisible = _codex2SevenDayUsed.HasValue;
         if (Codex2Section.IsVisible)
         {
             if (_codex2FiveHourUsed.HasValue)
@@ -1967,9 +1976,18 @@ public partial class UsagePopup : Window
                 SetUsedExpectedInlines(Codex2CompactFiveHourPercent, _codex2FiveHourUsed, _codex2FiveHourExpected);
                 Codex2CompactFiveHourReset.Text = _codex2FiveHourReset.HasValue ? $"in {FormatResetCountdown(_codex2FiveHourReset)}" : "";
             }
-            RenderCompactBar(Codex2CompactSevenDayBar, Codex2CompactSevenDayTick, Color.FromRgb(0x90, 0xCA, 0xF9), _codex2SevenDayUsed, _codex2SevenDayExpected, barWidth, codex2Out);
-            SetUsedExpectedInlines(Codex2CompactSevenDayPercent, _codex2SevenDayUsed, _codex2SevenDayExpected);
-            Codex2CompactSevenDayReset.Text = _codex2SevenDayReset.HasValue ? FormatResetDate(_codex2SevenDayReset) : "";
+            if (_codex2OneDayUsed.HasValue)
+            {
+                RenderCompactBar(Codex2CompactOneDayBar, Codex2CompactOneDayTick, Color.FromRgb(0x4F, 0xC3, 0xF7), _codex2OneDayUsed.Value, _codex2OneDayExpected, barWidth, codex2Out);
+                SetUsedExpectedInlines(Codex2CompactOneDayPercent, _codex2OneDayUsed, _codex2OneDayExpected);
+                Codex2CompactOneDayReset.Text = _codex2OneDayReset.HasValue ? $"in {FormatResetCountdown(_codex2OneDayReset)}" : "";
+            }
+            if (_codex2SevenDayUsed.HasValue)
+            {
+                RenderCompactBar(Codex2CompactSevenDayBar, Codex2CompactSevenDayTick, Color.FromRgb(0x90, 0xCA, 0xF9), _codex2SevenDayUsed.Value, _codex2SevenDayExpected, barWidth, codex2Out);
+                SetUsedExpectedInlines(Codex2CompactSevenDayPercent, _codex2SevenDayUsed, _codex2SevenDayExpected);
+                Codex2CompactSevenDayReset.Text = _codex2SevenDayReset.HasValue ? FormatResetDate(_codex2SevenDayReset) : "";
+            }
         }
 
         Codex2CompactSparkFiveHourRow.IsVisible = _codex2SparkFiveHourUsed.HasValue && Codex2Section.IsVisible;
@@ -2061,9 +2079,9 @@ public partial class UsagePopup : Window
 
         foreach (var (text, reset) in new[]
                  {
-                     (CodexCompact5hReset, _codex5hReset), (CodexCompact7dReset, _codex7dReset),
+                     (CodexCompact5hReset, _codex5hReset), (CodexCompact24hReset, _codex24hReset), (CodexCompact7dReset, _codex7dReset),
                      (CodexCompactSpark5hReset, _codexSpark5hReset), (CodexCompactSpark7dReset, _codexSpark7dReset),
-                     (Codex2CompactFiveHourReset, _codex2FiveHourReset), (Codex2CompactSevenDayReset, _codex2SevenDayReset),
+                     (Codex2CompactFiveHourReset, _codex2FiveHourReset), (Codex2CompactOneDayReset, _codex2OneDayReset), (Codex2CompactSevenDayReset, _codex2SevenDayReset),
                      (Codex2CompactSparkFiveHourReset, _codex2SparkFiveHourReset), (Codex2CompactSparkSevenDayReset, _codex2SparkSevenDayReset),
                      (ClaudeCompact5hReset, _claude5hReset), (ClaudeCompact7dReset, _claude7dReset),
                      (ClaudeCompactDesignReset, _claudeDesignReset), (ClaudeCompactFableReset, _claudeFableReset),
@@ -2073,9 +2091,9 @@ public partial class UsagePopup : Window
                  })
             ToolTip.SetTip(text, reset.HasValue ? $"Resets {FormatCentralTime(reset)}" : null);
 
-        SetResetTimesTooltip(CodexRangeText, ("5h", _codex5hReset), ("7d", _codex7dReset),
+        SetResetTimesTooltip(CodexRangeText, ("5h", _codex5hReset), ("24h", _codex24hReset), ("7d", _codex7dReset),
             ("Spark 5h", _codexSpark5hReset), ("Spark 7d", _codexSpark7dReset));
-        SetResetTimesTooltip(Codex2RangeText, ("5h", _codex2FiveHourReset), ("7d", _codex2SevenDayReset),
+        SetResetTimesTooltip(Codex2RangeText, ("5h", _codex2FiveHourReset), ("24h", _codex2OneDayReset), ("7d", _codex2SevenDayReset),
             ("Spark 5h", _codex2SparkFiveHourReset), ("Spark 7d", _codex2SparkSevenDayReset));
         SetResetTimesTooltip(ClaudeCodeRangeText, ("5h", _claude5hReset), ("7d", _claude7dReset),
             ("Design", _claudeDesignReset), ("Fable", _claudeFableReset));
@@ -2091,9 +2109,9 @@ public partial class UsagePopup : Window
         SetTextExhausted(ZaiCreditsText, zaiOut);
         foreach (var (bar, flag) in new[]
                  {
-                     (CodexCompact5hBar, codexOut), (CodexCompact7dBar, codexOut),
+                     (CodexCompact5hBar, codexOut), (CodexCompact24hBar, codexOut), (CodexCompact7dBar, codexOut),
                      (CodexCompactSpark5hBar, codexSparkOut), (CodexCompactSpark7dBar, codexSparkOut),
-                     (Codex2CompactFiveHourBar, codex2Out), (Codex2CompactSevenDayBar, codex2Out),
+                     (Codex2CompactFiveHourBar, codex2Out), (Codex2CompactOneDayBar, codex2Out), (Codex2CompactSevenDayBar, codex2Out),
                      (Codex2CompactSparkFiveHourBar, codex2SparkOut), (Codex2CompactSparkSevenDayBar, codex2SparkOut),
                      (ClaudeCompact5hBar, claudeOut), (ClaudeCompact7dBar, claudeOut),
                      (ClaudeCompactDesignBar, claudeDesignOut), (ClaudeCompactFableBar, claudeFableOut),
@@ -2231,8 +2249,9 @@ public partial class UsagePopup : Window
     private const double FullPercent = 99.5;
 
     // Account-wide windows only: per-model limits (Spark, Fable, Design) don't block the whole account.
+    // A full 24-hour Codex window blocks the account like a 5-hour or 7-day one.
     private static IEnumerable<UsageWindow?> AccountWideWindows(CodexBlock? codex, ClaudeBlock? claude) =>
-        new[] { codex?.Primary, codex?.Secondary, claude?.FiveHour, claude?.SevenDay };
+        new[] { codex?.Primary, codex?.OneDay, codex?.Secondary, claude?.FiveHour, claude?.SevenDay };
 
     private static AccountInfo WithAvailability(AccountInfo info, IEnumerable<UsageWindow?> accountWide)
     {

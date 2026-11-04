@@ -13,7 +13,10 @@ public record UsageWindow(
 public record ResetCredits(int AvailableCount, DateTimeOffset? NextExpiresAt, DateTimeOffset? CheckedAt = null);
 // FiveHour is null for accounts without a 5-hour limit (or with no open session); hide it then.
 public record ClaudeBlock(UsageWindow? FiveHour, UsageWindow SevenDay, UsageWindow? SevenDayDesign, UsageWindow? SevenDayFable, string? SubscriptionType, ResetCredits? Resets);
-public record CodexBlock(UsageWindow? Primary, UsageWindow Secondary, UsageWindow? SparkPrimary, UsageWindow? SparkSecondary, string? PlanType, string? CreditsBalance, ResetCredits? Resets);
+// Codex account-wide windows, each filed by its length: Primary is the 5-hour one, OneDay the 24-hour one,
+// Secondary the 7-day one. Any can be null (promax has no 5-hour window; a 24-hour one is rare), and the
+// account still shows with whichever windows it has.
+public record CodexBlock(UsageWindow? Primary, UsageWindow? Secondary, UsageWindow? SparkPrimary, UsageWindow? SparkSecondary, string? PlanType, string? CreditsBalance, ResetCredits? Resets, UsageWindow? OneDay = null);
 public record ZaiBlock(UsageWindow? FiveHour, UsageWindow? Monthly, long? MonthlyCurrent, long? MonthlyLimit, string? Level);
 public record OpenRouterBlock(double Usage, double? Limit, double? LimitRemaining, bool? IsFreeTier);
 public record OpenAiBlock(double SpendToday, double SpendMonth, string Currency);
@@ -233,15 +236,32 @@ public class UsageApiService : IDisposable
         return new ResetCredits(count, ReadDateTimeOffset(rc, "next_expires_at"), ReadDateTimeOffset(data, "reset_credits_checked_at"));
     }
 
+    // Which Codex slot a window of this length belongs to; the same cut-offs as usage-api
+    // (up to 12 h is the 5-hour window, up to 3 days the 24-hour one, longer the weekly one).
+    internal static string? CodexWindowSlot(double? windowMinutes) => windowMinutes switch
+    {
+        null or <= 0 => null,
+        <= 12 * 60 => "five_hour",
+        <= 3 * 24 * 60 => "one_day",
+        _ => "seven_day",
+    };
+
     private static CodexBlock? ParseCodex(JsonElement data)
     {
         if (data.ValueKind != JsonValueKind.Object) return null;
-        if (!data.TryGetProperty("secondary", out var sec) || sec.ValueKind != JsonValueKind.Object)
-            return null;
 
-        UsageWindow? primary = null;
-        if (data.TryGetProperty("primary", out var pri) && pri.ValueKind == JsonValueKind.Object)
-            primary = ParseWindow(pri, "used_percent");
+        // usage-api sends five_hour / one_day / seven_day (primary / secondary are older aliases of the
+        // 5-hour and 7-day ones). Each window is filed by its own length again, so an older usage-api that
+        // still puts a 24-hour window under five_hour or primary reads correctly too.
+        var windows = new Dictionary<string, UsageWindow>();
+        foreach (var (field, slot) in new[] { ("five_hour", "five_hour"), ("one_day", "one_day"), ("seven_day", "seven_day"),
+                     ("primary", "five_hour"), ("secondary", "seven_day") })
+        {
+            if (!data.TryGetProperty(field, out var el) || el.ValueKind != JsonValueKind.Object) continue;
+            windows.TryAdd(CodexWindowSlot(ReadDouble(el, "window_minutes")) ?? slot, ParseWindow(el, "used_percent"));
+        }
+        // No account-wide window at all means there is nothing to show yet.
+        if (windows.Count == 0) return null;
 
         UsageWindow? sparkPri = null, sparkSec = null;
         if (data.TryGetProperty("additional", out var add) && add.ValueKind == JsonValueKind.Array)
@@ -264,13 +284,14 @@ public class UsageApiService : IDisposable
         }
 
         return new CodexBlock(
-            primary,
-            ParseWindow(sec, "used_percent"),
+            windows.GetValueOrDefault("five_hour"),
+            windows.GetValueOrDefault("seven_day"),
             sparkPri,
             sparkSec,
             ReadString(data, "plan_type"),
             ReadString(data, "credits_balance"),
-            ParseResetCredits(data)
+            ParseResetCredits(data),
+            windows.GetValueOrDefault("one_day")
         );
     }
 
