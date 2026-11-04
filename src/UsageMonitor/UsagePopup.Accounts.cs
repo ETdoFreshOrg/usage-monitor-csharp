@@ -60,10 +60,11 @@ public partial class UsagePopup
             var title = new TextBlock { FontSize = 10, Foreground = new SolidColorBrush(color) };
             // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
             var email = account.Name == account.Key ? null : account.Name;
-            var info = AccountInfoFor(account.Key) is { } known ? known with { Email = email }
-                : new AccountInfo(email, account.Priority, account.FetchedAt, null, account.Staleness);
+            var info = WithAvailability(AccountInfoFor(account.Key) is { } known ? known with { Email = email }
+                : new AccountInfo(email, account.Priority, account.FetchedAt, null, account.Staleness),
+                AccountWideWindows(account.Codex, account.Claude));
             SetTitleWithPlan(title, (codex ? "Codex #" : "Claude #") + number, plan, resets, info);
-            ToolTip.SetTip(title, string.Join("\n", new[] { account.Name, ResetTooltip(resets), DataAgeTooltip(info) }.Where(t => t != null)));
+            ToolTip.SetTip(title, string.Join("\n", new[] { account.Name, AvailabilityTooltip(info), ResetTooltip(resets), DataAgeTooltip(info) }.Where(t => t != null)));
             full.Children.Add(title);
             MakeLink(title, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
             var compact = new DockPanel { LastChildFill = true };
@@ -113,7 +114,10 @@ public partial class UsagePopup
                 {
                     text.Foreground = new SolidColorBrush(color);
                     if (text.Inlines != null)
-                        foreach (var inline in text.Inlines) inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
+                        foreach (var inline in text.Inlines)
+                            // The availability countdown keeps its own color so "when is this usable" stays readable.
+                            if (inline is not Avalonia.Controls.Documents.Run run || !AvailabilityBadges.TryGetValue(run, out _))
+                                inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
                 }
             AdditionalAccountsCompact.Children.Add(compact);
             AdditionalAccountsFull.Children.Add(new Border { Child = full, Background = Brush.Parse("#222222"),

@@ -645,6 +645,7 @@ public partial class UsagePopup : Window
     private void SystemRefreshTimer_Tick(object? sender, EventArgs e)
     {
         RefreshSystem();
+        RefreshAvailabilityBadges(DateTimeOffset.Now);
     }
 
     private void RefreshSystem()
@@ -2180,57 +2181,119 @@ public partial class UsagePopup : Window
                 Foreground = new SolidColorBrush(PriorityColor),
                 FontSize = Math.Max(6, tb.FontSize - 2),
             });
-        var age = FormatDataAge(account?.FetchedAt, now ?? DateTimeOffset.Now);
-        if (!string.IsNullOrWhiteSpace(account?.Email) || age != null)
+        if (!string.IsNullOrWhiteSpace(account?.Email) || HasAvailability(account))
         {
             tb.Inlines.Add(new LineBreak());
-            AddAccountLine(tb.Inlines, account!.Email, age, account.Staleness, Math.Max(6, tb.FontSize - 2));
+            AddAccountLine(tb.Inlines, account!.Email, account, Math.Max(6, tb.FontSize - 2), now ?? DateTimeOffset.Now);
         }
-        var tips = new[] { ResetTooltip(resets), DataAgeTooltip(account) }.Where(t => t != null);
+        var tips = new[] { AvailabilityTooltip(account), ResetTooltip(resets), DataAgeTooltip(account, now) }.Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
 
-    // Email, then how old the account's numbers are ("live", "4m", "1h") colored by usage-api's tier.
-    private static void AddAccountLine(Avalonia.Controls.Documents.InlineCollection inlines, string? email, string? age,
-        string? staleness, double fontSize)
+    // Email, then when the account can next be used: "live" when no account-wide window is full,
+    // else a countdown to the latest reset among the full ones ("4h 58m", "2d 3h"). How old the
+    // numbers are lives in the tooltip.
+    private static void AddAccountLine(Avalonia.Controls.Documents.InlineCollection inlines, string? email,
+        AccountInfo? account, double fontSize, DateTimeOffset now)
     {
         if (!string.IsNullOrWhiteSpace(email))
             inlines.Add(new Run(email) { Foreground = new SolidColorBrush(EmailColor), FontSize = fontSize, FontWeight = FontWeight.Normal });
-        if (age != null)
-            inlines.Add(new Run((string.IsNullOrWhiteSpace(email) ? "" : " · ") + age)
-                { Foreground = new SolidColorBrush(DataAgeColor(age, staleness)), FontSize = fontSize, FontWeight = FontWeight.Normal });
+        if (!HasAvailability(account)) return;
+        var badge = new AvailabilityBadge(string.IsNullOrWhiteSpace(email) ? "" : " · ", account!.Blocked, account.AvailableAt);
+        var run = new Run(badge.Text(now))
+            { Foreground = new SolidColorBrush(AvailabilityColor(account)), FontSize = fontSize, FontWeight = FontWeight.Normal };
+        AvailabilityBadges.AddOrUpdate(run, badge);
+        inlines.Add(run);
     }
 
-    // Data younger than this reads "live": passive numbers are refreshed every ~30 s while an account is in use.
-    private static readonly TimeSpan LiveAge = TimeSpan.FromMinutes(2);
+    // Shown once the account has numbers (or is known to be blocked); hidden for an account with no data yet.
+    private static bool HasAvailability(AccountInfo? account) => account is { FetchedAt: not null } or { Blocked: true };
+
+    private sealed record AvailabilityBadge(string Prefix, bool Blocked, DateTimeOffset? AvailableAt)
+    {
+        public string Text(DateTimeOffset now) => Prefix + FormatAvailability(Blocked, AvailableAt, now);
+    }
+
+    // Every badge Run on screen, so the countdowns tick down between usage-api refreshes without a re-render.
+    // Weak keys: runs from replaced cards drop out on their own.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Run, AvailabilityBadge> AvailabilityBadges = new();
+
+    private static void RefreshAvailabilityBadges(DateTimeOffset now)
+    {
+        foreach (var (run, badge) in AvailabilityBadges)
+        {
+            var text = badge.Text(now);
+            if (run.Text != text) run.Text = text;
+        }
+    }
+
+    // A window counts as full where the bars already grey out (shown as 100%).
+    private const double FullPercent = 99.5;
+
+    // Account-wide windows only: per-model limits (Spark, Fable, Design) don't block the whole account.
+    private static IEnumerable<UsageWindow?> AccountWideWindows(CodexBlock? codex, ClaudeBlock? claude) =>
+        new[] { codex?.Primary, codex?.Secondary, claude?.FiveHour, claude?.SevenDay };
+
+    private static AccountInfo WithAvailability(AccountInfo info, IEnumerable<UsageWindow?> accountWide)
+    {
+        var full = accountWide.Where(w => w is { UsedPercent: >= FullPercent }).Select(w => w!).ToList();
+        if (full.Count == 0) return info with { Blocked = false, AvailableAt = null };
+        // Usable again only once every full window has reset; an unknown reset leaves the time unknown.
+        var availableAt = full.Any(w => w.ResetsAt == null) ? null : full.Max(w => w.ResetsAt);
+        return info with { Blocked = true, AvailableAt = availableAt };
+    }
+
+    private static string FormatAvailability(bool blocked, DateTimeOffset? availableAt, DateTimeOffset now)
+    {
+        if (!blocked) return "live";
+        if (availableAt is not { } at) return "out";
+        var left = at - now;
+        // The window has reset; the next refresh shows the new numbers.
+        if (left <= TimeSpan.Zero) return "live";
+        if (left.TotalDays >= 1) return $"{(int)left.TotalDays}d {left.Hours}h";
+        if (left.TotalHours >= 1) return $"{(int)left.TotalHours}h {left.Minutes}m";
+        return left.TotalMinutes >= 1 ? $"{(int)left.TotalMinutes}m" : "<1m";
+    }
+
+    private static readonly Color LiveColor = Color.FromRgb(0x81, 0xC7, 0x84);
+    private static readonly Color BlockedBadgeColor = Color.FromRgb(0xE5, 0x73, 0x73);
+
+    // Blocked counts down in red. "live" is green, but amber/grey when usage-api says its numbers are getting old.
+    private static Color AvailabilityColor(AccountInfo account) => account.Blocked ? BlockedBadgeColor : account.Staleness switch
+    {
+        "stale" => StaleBadgeColor,
+        "little_stale" => Color.FromRgb(0xFF, 0xB7, 0x4D),
+        _ => LiveColor,
+    };
+    private static readonly Color StaleBadgeColor = Color.FromRgb(0x9E, 0x9E, 0x9E);
+
+    private static string? AvailabilityTooltip(AccountInfo? account)
+    {
+        if (account is not { Blocked: true }) return HasAvailability(account) ? "Usable now" : null;
+        return account.AvailableAt is { } at ? $"Out of usage until {FormatCentralTime(at)}" : "Out of usage (reset time unknown)";
+    }
 
     private static string? FormatDataAge(DateTimeOffset? at, DateTimeOffset now)
     {
         if (at is not { } t) return null;
         var age = now - t;
-        if (age < LiveAge) return "live";
-        if (age < TimeSpan.FromHours(1)) return $"{(int)age.TotalMinutes}m";
-        if (age < TimeSpan.FromHours(48)) return $"{(int)age.TotalHours}h";
-        return $"{(int)age.TotalDays}d";
+        if (age < TimeSpan.FromMinutes(2)) return "just now";
+        if (age < TimeSpan.FromHours(1)) return $"{(int)age.TotalMinutes}m ago";
+        if (age < TimeSpan.FromHours(48)) return $"{(int)age.TotalHours}h ago";
+        return $"{(int)age.TotalDays}d ago";
     }
 
-    private static Color DataAgeColor(string age, string? staleness) => staleness switch
-    {
-        "stale" => Color.FromRgb(0xE5, 0x73, 0x73),
-        "little_stale" => Color.FromRgb(0xFF, 0xB7, 0x4D),
-        _ => age == "live" ? Color.FromRgb(0x81, 0xC7, 0x84) : EmailColor,
-    };
-
-    private static string? DataAgeTooltip(AccountInfo? account)
+    private static string? DataAgeTooltip(AccountInfo? account, DateTimeOffset? now = null)
     {
         if (account?.FetchedAt is not { } at) return null;
         var how = account.DataSource switch
         {
-            "passive" => "Seen in CPA request headers",
-            "active" => "Checked with the usage endpoint",
-            _ => "Updated",
+            "passive" => "seen in CPA request headers",
+            "active" => "checked with the usage endpoint",
+            _ => "updated",
         };
-        return $"{how} {FormatCentralTime(at)}";
+        var tier = account.Staleness switch { "stale" => " (stale)", "little_stale" => " (a little stale)", _ => "" };
+        return $"Data {FormatDataAge(at, now ?? DateTimeOffset.Now)}{tier}: {how} {FormatCentralTime(at)}";
     }
 
     // Which login an account is and the routing priority CLIProxyAPI gives it
@@ -2238,8 +2301,18 @@ public partial class UsagePopup : Window
     private static readonly Color PriorityColor = Color.FromRgb(0xB3, 0x9D, 0xDB);
     private static readonly Color EmailColor = Color.FromRgb(0x77, 0x77, 0x77);
 
-    private AccountInfo? AccountInfoFor(string key) =>
-        _lastStatus?.Accounts is { } accounts && accounts.TryGetValue(key, out var info) ? info : null;
+    private AccountInfo? AccountInfoFor(string key)
+    {
+        if (_lastStatus?.Accounts is not { } accounts || !accounts.TryGetValue(key, out var info)) return null;
+        return key switch
+        {
+            "codex" => WithAvailability(info, AccountWideWindows(_lastStatus.Codex, null)),
+            "codex2" => WithAvailability(info, AccountWideWindows(_lastStatus.Codex2, null)),
+            "claude" => WithAvailability(info, AccountWideWindows(null, _lastStatus.Claude)),
+            "claude2" => WithAvailability(info, AccountWideWindows(null, _lastStatus.Claude2)),
+            _ => info,
+        };
+    }
 
     private static string? FormatPriority(double? priority) =>
         priority is { } p ? "P" + p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : null;
@@ -2257,10 +2330,9 @@ public partial class UsagePopup : Window
     private static void SetCompactEmail(TextBlock tb, AccountInfo? account, DateTimeOffset? now = null)
     {
         tb.Inlines!.Clear();
-        var age = FormatDataAge(account?.FetchedAt, now ?? DateTimeOffset.Now);
-        AddAccountLine(tb.Inlines, ShortEmail(account?.Email), age, account?.Staleness, tb.FontSize);
+        AddAccountLine(tb.Inlines, ShortEmail(account?.Email), account, tb.FontSize, now ?? DateTimeOffset.Now);
         tb.IsVisible = tb.Inlines.Count > 0;
-        var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, DataAgeTooltip(account) }
+        var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, AvailabilityTooltip(account), DataAgeTooltip(account, now) }
             .Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
