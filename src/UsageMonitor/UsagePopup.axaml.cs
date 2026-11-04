@@ -1219,17 +1219,14 @@ public partial class UsagePopup : Window
     // interior hole. With all cards visible this reproduces the original cell layout.
     private void ReflowAiGrid()
     {
-        Control[] sections =
+        // Account cards grouped by provider and sorted by priority, as in the compact list; Z.ai after Claude.
+        var accountCards = SortAccounts(new (Control Card, AccountSortKey Key)[]
         {
-            OpenRouterSection,
-            OpenAiSection,
-            JevSection,
-            CodexSection,
-            Codex2Section,
-            ClaudeCodeSection,
-            ZaiSection,
-            ClaudeCode2Section,
-        };
+            (CodexSection, FixedKey("codex", 0)), (Codex2Section, FixedKey("codex2", 1)),
+            (ClaudeCodeSection, FixedKey("claude", 2)), (ClaudeCode2Section, FixedKey("claude2", 3)),
+        }, c => c.Key).Select(c => c.Card);
+        var sections = new Control[] { OpenRouterSection, OpenAiSection, JevSection }
+            .Concat(accountCards).Append(ZaiSection);
 
         var slot = 0;
         foreach (var section in sections)
@@ -2120,6 +2117,9 @@ public partial class UsagePopup : Window
                      (ZaiCompact5hBar, zaiOut), (ZaiCompactMoBar, zaiMoOut),
                  })
             SetCompactRowExhausted(bar, flag);
+
+        // Visibility of the fixed blocks is settled above, so the provider labels can follow it.
+        OrderCompactAccounts();
     }
 
     private static void ApplyCodexBalance(TextBlock full, Grid row, TextBlock compact, string? balance, string label)
