@@ -36,8 +36,7 @@ public partial class UsagePopup
             var windows = new List<(string Label, UsageWindow Window)>();
             if (account.Codex is { } cx)
             {
-                if (cx.Primary != null) windows.Add(("5h", cx.Primary));
-                windows.Add(("7d", cx.Secondary));
+                windows.AddRange(CodexAccountWindows(cx));
                 if (_config.ShowCodexSpark && cx.SparkPrimary != null) windows.Add(("Sp5h", cx.SparkPrimary));
                 if (_config.ShowCodexSpark && cx.SparkSecondary != null) windows.Add(("Sp7d", cx.SparkSecondary));
             }
@@ -147,7 +146,8 @@ public partial class UsagePopup
         SetUsedExpectedInlines(percent, window.UsedPercent, color == ExhaustedColor ? null : window.ExpectedPercent);
         Grid.SetColumn(percent, 2);
         row.Children.Add(percent);
-        var reset = new TextBlock { Text = label.EndsWith("5h") ? FormatResetCountdown(window.ResetsAt) : FormatResetDate(window.ResetsAt),
+        // Windows that reset within a day or so count down; weekly ones show the date.
+        var reset = new TextBlock { Text = label.EndsWith("5h") || label.EndsWith("24h") ? FormatResetCountdown(window.ResetsAt) : FormatResetDate(window.ResetsAt),
             FontSize = 8, Foreground = color == ExhaustedColor ? new SolidColorBrush(color) : Brush.Parse("#888888"), TextAlignment = TextAlignment.Right };
         SetResetTimesTooltip(reset, ("Resets", window.ResetsAt));
         Grid.SetColumn(reset, 3);

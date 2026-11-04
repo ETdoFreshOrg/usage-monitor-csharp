@@ -96,35 +96,66 @@ var wide = (IEnumerable<UsageMonitor.Services.UsageWindow?>)typeof(UsagePopup).G
 Check(Badge(Avail(wide.ToArray()), now) == "x@uno.edu · live", "Per-model full window blocked the account");
 Check(((string?)ToolTip.GetTip(email))!.Contains("Usable now"), "Usable tooltip missing");
 
+// A full 24-hour Codex window blocks the account until it resets.
+var dayReset = now.AddHours(20).AddMinutes(5);
+var dayOnly = new UsageMonitor.Services.CodexBlock(null, null, null, null, null, null, null, W(100, dayReset));
+var dayWide = (IEnumerable<UsageMonitor.Services.UsageWindow?>)typeof(UsagePopup).GetMethod("AccountWideWindows", BindingFlags.NonPublic | BindingFlags.Static)!
+    .Invoke(null, new object?[] { dayOnly, null })!;
+Check(Badge(Avail(dayWide.ToArray()), now) == "x@uno.edu · 20h 5m", "Full 24-hour window should count down to its reset");
+var dayWithWeek = new UsageMonitor.Services.CodexBlock(null, W(100, weekReset), null, null, null, null, null, W(100, dayReset));
+dayWide = (IEnumerable<UsageMonitor.Services.UsageWindow?>)typeof(UsagePopup).GetMethod("AccountWideWindows", BindingFlags.NonPublic | BindingFlags.Static)!
+    .Invoke(null, new object?[] { dayWithWeek, null })!;
+Check(Badge(Avail(dayWide.ToArray()), now) == "x@uno.edu · 2d 3h", "Full 24-hour and 7-day windows should wait for the later reset");
+var labels = ((IEnumerable<(string Label, UsageMonitor.Services.UsageWindow Window)>)Call("CodexAccountWindows",
+    new UsageMonitor.Services.CodexBlock(W(1, fiveReset), W(2, weekReset), null, null, null, null, null, W(3, dayReset)))!).Select(w => w.Label);
+Check(string.Join(",", labels) == "5h,24h,7d", $"Codex window rows wrong: {string.Join(",", labels)}");
+var summaryReset = DateTimeOffset.Now.AddHours(20).AddMinutes(5).AddSeconds(30);
+Check((string?)Call("CodexResetSummary", new UsageMonitor.Services.CodexBlock(null, null, null, null, null, null, null, W(5, summaryReset))) == "24h: in 20h 5m",
+    "24-hour reset summary wrong");
+
 // Countdowns tick between refreshes without a re-render.
 Call("SetCompactEmail", email, Avail(W(100, fiveReset), W(60, weekReset)), now);
 Call("RefreshAvailabilityBadges", now.AddHours(1));
 Check(email.Inlines!.Text == "x@uno.edu · 3h 58m", $"Badge did not tick: {email.Inlines.Text}");
 Call("RefreshAvailabilityBadges", now.AddHours(4).AddMinutes(57).AddSeconds(30));
 Check(email.Inlines!.Text == "x@uno.edu · <1m", $"Badge final minute wrong: {email.Inlines.Text}");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, data age tooltip");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, 24h badge, data age tooltip");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
  "claude12":{"account":{"id":"twelfth","name":"Twelfth Account"},"data":{"five_hour":null,"seven_day":{"utilization":3}}},
  "claude13":{"account":{"id":"thirteenth","name":"Thirteenth Account"},"data":{"five_hour":{"utilization":99,"expected_percent":40,"resets_at":"2026-11-03T23:30:00Z"},"seven_day":{"utilization":73}}},
+ "codex4":{"account":{"id":"fourth","name":"Daily Account"},"data":{"plan_type":"pro","five_hour":null,"seven_day":null,"primary":null,"secondary":null,
+   "one_day":{"used_percent":12,"window_minutes":1440,"expected_percent":30,"resets_at":"2026-11-05T03:47:01Z"}}},
+ "codex5":{"account":{"id":"fifth","name":"Old API"},"data":{"five_hour":{"used_percent":7,"window_minutes":1440,"resets_at":"2026-11-05T03:47:01Z"},
+   "primary":{"used_percent":7,"window_minutes":1440,"resets_at":"2026-11-05T03:47:01Z"},"seven_day":null,"secondary":null}},
+ "codex6":{"account":{"id":"sixth","name":"No windows"},"data":{"five_hour":null,"seven_day":null}},
  "codex2":{"data":{"secondary":{"used_percent":1}}},"openai":{"data":{}}}
 """);
 var parsedAccounts = (IReadOnlyList<UsageMonitor.Services.UsageAccount>)typeof(UsageMonitor.Services.UsageApiService)
     .GetMethod("ParseAdditionalAccounts", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { accountJson.RootElement })!;
-Check(parsedAccounts.Count == 3, "Dynamic parser included legacy or unrelated providers");
+Check(parsedAccounts.Count == 6, $"Dynamic parser included legacy or unrelated providers ({parsedAccounts.Count})");
 Check(parsedAccounts[0].Id == "third" && parsedAccounts[0].Codex?.CreditsBalance == "0", "Codex #3 identity or credits missing");
-Check(parsedAccounts[1].Claude?.SevenDay.UsedPercent == 3, "Claude #12 usage missing");
-Check(parsedAccounts[1].Claude?.FiveHour == null, "Claude #12 without a 5-hour window got one");
-Check(parsedAccounts[2].Claude?.FiveHour is { UsedPercent: 99, ExpectedPercent: 40 } fh
+Check(parsedAccounts[0].Codex is { Secondary.UsedPercent: 35, Primary: null, OneDay: null }, "Legacy secondary-only Codex not read as 7d");
+// A Codex account with only a 24-hour window is shown, not dropped for lacking a weekly window.
+Check(parsedAccounts[1].Codex is { Primary: null, Secondary: null, OneDay: { UsedPercent: 12, ExpectedPercent: 30 } } day
+      && day.OneDay!.ResetsAt == DateTimeOffset.Parse("2026-11-05T03:47:01Z"), "24-hour-only Codex account missing or misread");
+// usage-api builds from before one_day put that window under five_hour/primary; its length files it as 24h.
+Check(parsedAccounts[2].Codex is { Primary: null, Secondary: null, OneDay.UsedPercent: 7 }, "Old-API 24-hour window read as 5h");
+Check(parsedAccounts[3].Codex == null, "Codex account with no windows should have no block");
+Check(parsedAccounts[4].Claude?.SevenDay.UsedPercent == 3, "Claude #12 usage missing");
+Check(parsedAccounts[4].Claude?.FiveHour == null, "Claude #12 without a 5-hour window got one");
+Check(parsedAccounts[5].Claude?.FiveHour is { UsedPercent: 99, ExpectedPercent: 40 } fh
       && fh.ResetsAt == DateTimeOffset.Parse("2026-11-03T23:30:00Z"), "Claude #13 5-hour window missing");
-Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Claude 5h only where reported, legacy compatibility");
+Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Claude 5h only where reported, Codex 24h-only accounts, legacy compatibility");
 
 if (Environment.GetEnvironmentVariable("USAGE_CHECK_LIVE_URL") is { Length: > 0 } liveUrl)
 {
     using var service = new UsageMonitor.Services.UsageApiService(liveUrl);
     var status = await service.GetStatusAsync();
     Check(status?.Codex != null && status.Claude != null, "Live primary accounts missing");
+    Console.WriteLine("Live Codex #1 windows: " + string.Join(", ", ((IEnumerable<(string Label, UsageMonitor.Services.UsageWindow Window)>)Call("CodexAccountWindows", status!.Codex)!)
+        .Select(w => $"{w.Label} {w.Window.UsedPercent}%")));
     Check(status!.AdditionalAccounts?.Any(a => a.Key == "codex3" && a.Codex != null) == true, "Live Codex #3 missing");
     Console.WriteLine("PASS: live monitor API client reads primary accounts and Codex #3");
     using var recentService = new UsageMonitor.Services.GateService(liveUrl);
