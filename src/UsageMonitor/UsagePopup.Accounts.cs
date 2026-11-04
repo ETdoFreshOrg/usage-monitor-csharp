@@ -26,8 +26,12 @@ public partial class UsagePopup
         var changed = !_additionalAccounts.Select(a => (a.Id, a.Name)).SequenceEqual(accounts.Select(a => (a.Id, a.Name)));
         _additionalAccounts = accounts;
         AdditionalAccountsFull.Children.Clear();
-        AdditionalAccountsCompact.Children.Clear();
-        foreach (var account in accounts)
+        foreach (var old in _extraCompactKeys.Keys) AccountsCompact.Children.Remove(old);
+        _extraCompactKeys.Clear();
+        // Same order as the compact list: Codex then Claude, each by CPA priority (highest first).
+        var ordered = SortAccounts(accounts.Select((a, i) => (Account: a,
+            Key: new AccountSortKey(ProviderRank(a.Key), AccountInfoFor(a.Key)?.Priority ?? a.Priority, AccountEmail(a), 100 + i))), x => x.Key);
+        foreach (var (account, sortKey) in ordered)
         {
             if (!IsAccountVisible(account.Id)) continue;
             var codex = account.Key.StartsWith("codex", StringComparison.Ordinal);
@@ -58,7 +62,7 @@ public partial class UsagePopup
             var full = new StackPanel { Spacing = 3 };
             var title = new TextBlock { FontSize = 10, Foreground = new SolidColorBrush(color) };
             // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
-            var email = account.Name == account.Key ? null : account.Name;
+            var email = AccountEmail(account);
             var info = WithAvailability(AccountInfoFor(account.Key) is { } known ? known with { Email = email }
                 : new AccountInfo(email, account.Priority, account.FetchedAt, null, account.Staleness),
                 AccountWideWindows(account.Codex, account.Claude));
@@ -118,13 +122,69 @@ public partial class UsagePopup
                             if (inline is not Avalonia.Controls.Documents.Run run || !AvailabilityBadges.TryGetValue(run, out _))
                                 inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
                 }
-            AdditionalAccountsCompact.Children.Add(compact);
+            _extraCompactKeys[compact] = sortKey;
+            AccountsCompact.Children.Add(compact);
             AdditionalAccountsFull.Children.Add(new Border { Child = full, Background = Brush.Parse("#222222"),
                 CornerRadius = new CornerRadius(8), Padding = new Thickness(8) });
         }
         if (AdditionalAccountsFull.Parent is Control fullHost) fullHost.IsVisible = AdditionalAccountsFull.Children.Count > 0;
-        if (AdditionalAccountsCompact.Parent is Control compactHost) compactHost.IsVisible = AdditionalAccountsCompact.Children.Count > 0;
+        OrderCompactAccounts();
         if (changed) AccountsChanged?.Invoke();
+    }
+
+    // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
+    private static string? AccountEmail(UsageAccount account) => account.Name == account.Key ? null : account.Name;
+
+    // Compact account blocks built here, with their place in the provider/priority order.
+    private readonly Dictionary<Control, AccountSortKey> _extraCompactKeys = new();
+
+    internal sealed record AccountSortKey(int Provider, double? Priority, string? Email, int Seq);
+
+    private static int ProviderRank(string key) =>
+        key.StartsWith("codex", StringComparison.Ordinal) ? 0 : key.StartsWith("claude", StringComparison.Ordinal) ? 1 : 2;
+
+    // Provider (Codex, Claude, Z.ai), then CPA priority highest first (CPA routes to it first),
+    // unset priority last, then email, then the original order.
+    internal static IEnumerable<T> SortAccounts<T>(IEnumerable<T> items, Func<T, AccountSortKey> key) =>
+        items.OrderBy(i => key(i).Provider)
+            .ThenBy(i => key(i).Priority.HasValue ? 0 : 1)
+            .ThenByDescending(i => key(i).Priority ?? 0)
+            .ThenBy(i => key(i).Email ?? "\uffff", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(i => key(i).Seq);
+
+    private AccountSortKey FixedKey(string key, int seq) =>
+        new(ProviderRank(key), AccountInfoFor(key)?.Priority, AccountInfoFor(key)?.Email, seq);
+
+    private TextBlock?[] _groupLabels = new TextBlock?[3];
+    private static readonly (string Text, string Color)[] GroupLabelStyle =
+        { ("Codex", "#8BC34A"), ("Claude", "#FF8A65"), ("Z.ai", "#BA68C8") };
+
+    /// Puts every compact account block in provider order, each provider under a small label.
+    private void OrderCompactAccounts()
+    {
+        if (AccountsCompact == null) return;
+        var blocks = new List<(Control Block, AccountSortKey Key)>
+        {
+            (CodexCompactSection, FixedKey("codex", 0)), (Codex2CompactSection, FixedKey("codex2", 1)),
+            (ClaudeCompactSection, FixedKey("claude", 2)), (Claude2CompactSection, FixedKey("claude2", 3)),
+            (ZaiCompactSection, new AccountSortKey(2, null, null, 4)),
+        };
+        blocks.AddRange(_extraCompactKeys.Select(kv => (kv.Key, kv.Value)));
+        var desired = new List<Control>();
+        foreach (var group in SortAccounts(blocks, b => b.Key).GroupBy(b => b.Key.Provider))
+        {
+            var label = _groupLabels[group.Key] ??= new TextBlock
+            {
+                Text = GroupLabelStyle[group.Key].Text, FontSize = 8, FontWeight = FontWeight.Bold,
+                Foreground = Brush.Parse(GroupLabelStyle[group.Key].Color), Opacity = 0.8, Margin = new Thickness(0, 3, 0, -1),
+            };
+            label.IsVisible = group.Any(b => b.Block.IsVisible);
+            desired.Add(label);
+            desired.AddRange(group.Select(b => b.Block));
+        }
+        if (AccountsCompact.Children.SequenceEqual(desired)) return;
+        AccountsCompact.Children.Clear();
+        AccountsCompact.Children.AddRange(desired);
     }
 
     private static readonly Color StaleColor = Color.Parse("#777777");

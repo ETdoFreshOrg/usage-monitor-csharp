@@ -438,256 +438,259 @@
                         <UniformGrid x:Name="GateCompactStrip" Grid.Column="1" Rows="1" Columns="20" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
                         <TextBlock x:Name="GateCompactTally" Grid.Column="2" Text="" FontSize="8" VerticalAlignment="Center" HorizontalAlignment="Left" />
                     </Grid>
-                    <DockPanel x:Name="CodexCompactSection" LastChildFill="True">
-                        <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
-                        <TextBlock x:Name="CodexCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
-                        <TextBlock x:Name="CodexCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
-                        <StackPanel Spacing="1">
-                            <Grid x:Name="CodexCompact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock x:Name="CodexCompactFiveHourLabelText" Text="Codex 5h" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="CodexCompact5hBar" Background="#8BC34A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="CodexCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                    <!-- Every account block in one list, grouped by provider (Codex, Claude, Z.ai) and sorted by
+                         CPA priority in code (OrderCompactAccounts). The cap matches the old fixed blocks + 240 px of extras. -->
+                    <ScrollViewer MaxHeight="480" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="AccountsCompact" Spacing="2">
+                        <DockPanel x:Name="CodexCompactSection" LastChildFill="True">
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                            <TextBlock x:Name="CodexCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
+                            <TextBlock x:Name="CodexCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
+                            <StackPanel Spacing="1">
+                                <Grid x:Name="CodexCompact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock x:Name="CodexCompactFiveHourLabelText" Text="Codex 5h" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="CodexCompact5hBar" Background="#8BC34A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="CodexCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CodexCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="CodexCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="CodexCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="CodexCompact24hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock x:Name="CodexCompactOneDayLabelText" Text="Codex 24h" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="CodexCompact24hBar" Background="#CDDC39" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="CodexCompact24hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="CodexCompact24hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock x:Name="CodexCompactOneDayLabelText" Text="Codex 24h" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="CodexCompact24hBar" Background="#CDDC39" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="CodexCompact24hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexCompact24hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CodexCompact24hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="CodexCompact24hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="CodexCompact24hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="CodexCompact7dRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock x:Name="CodexCompactSevenDayLabelText" Text="Codex 7d" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="CodexCompact7dBar" Background="#B39DDB" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="CodexCompact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="CodexCompact7dRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock x:Name="CodexCompactSevenDayLabelText" Text="Codex 7d" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="CodexCompact7dBar" Background="#B39DDB" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="CodexCompact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexCompact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CodexCompact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="CodexCompact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#D3F2A3" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="CodexCompact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="CodexCompactSpark5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Spark 5h" FontSize="9" Foreground="#4DD0E1" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="CodexCompactSpark5hBar" Background="#4DD0E1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="CodexCompactSpark5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="CodexCompactSpark5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Spark 5h" FontSize="9" Foreground="#4DD0E1" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="CodexCompactSpark5hBar" Background="#4DD0E1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="CodexCompactSpark5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexCompactSpark5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#B4ECF2" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CodexCompactSpark5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="CodexCompactSpark5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#B4ECF2" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="CodexCompactSpark5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="CodexCompactSpark7dRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Spark 7d" FontSize="9" Foreground="#4DD0E1" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="CodexCompactSpark7dBar" Background="#4DB6AC" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="CodexCompactSpark7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="CodexCompactSpark7dRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Spark 7d" FontSize="9" Foreground="#4DD0E1" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="CodexCompactSpark7dBar" Background="#4DB6AC" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="CodexCompactSpark7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="CodexCompactSpark7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#B4ECF2" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CodexCompactSpark7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="CodexCompactSpark7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#B4ECF2" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="CodexCompactSpark7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="CodexCompactBalanceRow" ColumnDefinitions="58,*" IsVisible="False">
-                                <TextBlock x:Name="CodexCompactBalanceLabel" Text="Codex CR" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" />
-                                <TextBlock x:Name="CodexCompactBalanceText" Grid.Column="1" FontSize="8" Foreground="#D3F2A3" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
+                                <Grid x:Name="CodexCompactBalanceRow" ColumnDefinitions="58,*" IsVisible="False">
+                                    <TextBlock x:Name="CodexCompactBalanceLabel" Text="Codex CR" FontSize="9" Foreground="#8BC34A" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="CodexCompactBalanceText" Grid.Column="1" FontSize="8" Foreground="#D3F2A3" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
                     
-                    </DockPanel>
-                    <DockPanel x:Name="Codex2CompactSection" LastChildFill="True" IsVisible="False">
-                        <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
-                        <TextBlock x:Name="Codex2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
-                        <TextBlock x:Name="Codex2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
-                        <StackPanel Spacing="1">
-                            <Grid x:Name="Codex2CompactFiveHourRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Codex2 5h" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Codex2CompactFiveHourBar" Background="#64B5F6" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Codex2CompactFiveHourTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                        </DockPanel>
+                        <DockPanel x:Name="Codex2CompactSection" LastChildFill="True" IsVisible="False">
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                            <TextBlock x:Name="Codex2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
+                            <TextBlock x:Name="Codex2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
+                            <StackPanel Spacing="1">
+                                <Grid x:Name="Codex2CompactFiveHourRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Codex2 5h" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Codex2CompactFiveHourBar" Background="#64B5F6" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Codex2CompactFiveHourTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Codex2CompactFiveHourPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Codex2CompactFiveHourReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Codex2CompactFiveHourPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Codex2CompactFiveHourReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Codex2CompactOneDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Codex2 24h" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Codex2CompactOneDayBar" Background="#4FC3F7" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Codex2CompactOneDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Codex2CompactOneDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Codex2 24h" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Codex2CompactOneDayBar" Background="#4FC3F7" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Codex2CompactOneDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Codex2CompactOneDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Codex2CompactOneDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Codex2CompactOneDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Codex2CompactOneDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Codex2CompactSevenDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Codex2 7d" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Codex2CompactSevenDayBar" Background="#90CAF9" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Codex2CompactSevenDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Codex2CompactSevenDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Codex2 7d" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Codex2CompactSevenDayBar" Background="#90CAF9" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Codex2CompactSevenDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Codex2CompactSevenDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Codex2CompactSevenDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Codex2CompactSevenDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#BBDEFB" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Codex2CompactSevenDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Codex2CompactSparkFiveHourRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="C2 Sp5h" FontSize="9" Foreground="#9575CD" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Codex2CompactSparkFiveHourBar" Background="#9575CD" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Codex2CompactSparkFiveHourTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Codex2CompactSparkFiveHourRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="C2 Sp5h" FontSize="9" Foreground="#9575CD" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Codex2CompactSparkFiveHourBar" Background="#9575CD" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Codex2CompactSparkFiveHourTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Codex2CompactSparkFiveHourPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#D1C4E9" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Codex2CompactSparkFiveHourReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Codex2CompactSparkFiveHourPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#D1C4E9" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Codex2CompactSparkFiveHourReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Codex2CompactSparkSevenDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="C2 Sp7d" FontSize="9" Foreground="#9575CD" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Codex2CompactSparkSevenDayBar" Background="#B39DDB" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Codex2CompactSparkSevenDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Codex2CompactSparkSevenDayRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="C2 Sp7d" FontSize="9" Foreground="#9575CD" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Codex2CompactSparkSevenDayBar" Background="#B39DDB" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Codex2CompactSparkSevenDayTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Codex2CompactSparkSevenDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#D1C4E9" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Codex2CompactSparkSevenDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Codex2CompactSparkSevenDayPercent" Grid.Column="2" Text="—" FontSize="8" Foreground="#D1C4E9" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Codex2CompactSparkSevenDayReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Codex2CompactBalanceRow" ColumnDefinitions="58,*" IsVisible="False">
-                                <TextBlock Text="Codex2 CR" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" />
-                                <TextBlock x:Name="Codex2CompactBalanceText" Grid.Column="1" FontSize="8" Foreground="#BBDEFB" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
+                                <Grid x:Name="Codex2CompactBalanceRow" ColumnDefinitions="58,*" IsVisible="False">
+                                    <TextBlock Text="Codex2 CR" FontSize="9" Foreground="#64B5F6" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="Codex2CompactBalanceText" Grid.Column="1" FontSize="8" Foreground="#BBDEFB" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
                     
-                    </DockPanel>
-                    <DockPanel x:Name="ClaudeCompactSection" LastChildFill="True">
-                        <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
-                        <TextBlock x:Name="ClaudeCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
-                        <TextBlock x:Name="ClaudeCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
-                        <StackPanel Spacing="1">
-                            <Grid x:Name="ClaudeCompact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Claude 5h" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ClaudeCompact5hBar" Background="#FF8A65" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ClaudeCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                        </DockPanel>
+                        <DockPanel x:Name="ClaudeCompactSection" LastChildFill="True">
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                            <TextBlock x:Name="ClaudeCompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
+                            <TextBlock x:Name="ClaudeCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
+                            <StackPanel Spacing="1">
+                                <Grid x:Name="ClaudeCompact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Claude 5h" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ClaudeCompact5hBar" Background="#FF8A65" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ClaudeCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ClaudeCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudeCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ClaudeCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Claude 7d" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ClaudeCompact7dBar" Background="#FFB74D" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ClaudeCompact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Claude 7d" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ClaudeCompact7dBar" Background="#FFB74D" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ClaudeCompact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeCompact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ClaudeCompact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudeCompact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ClaudeCompact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="ClaudeCompactDesignRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Design 7d" FontSize="9" Foreground="#F48FB1" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ClaudeCompactDesignBar" Background="#F48FB1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ClaudeCompactDesignTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="ClaudeCompactDesignRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Design 7d" FontSize="9" Foreground="#F48FB1" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ClaudeCompactDesignBar" Background="#F48FB1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ClaudeCompactDesignTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeCompactDesignPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FCD4E1" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ClaudeCompactDesignReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudeCompactDesignPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FCD4E1" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ClaudeCompactDesignReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="ClaudeCompactFableRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Fable 7d" FontSize="9" Foreground="#E2703A" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ClaudeCompactFableBar" Background="#E2703A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ClaudeCompactFableTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="ClaudeCompactFableRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Fable 7d" FontSize="9" Foreground="#E2703A" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ClaudeCompactFableBar" Background="#E2703A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ClaudeCompactFableTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ClaudeCompactFablePct" Grid.Column="2" Text="—" FontSize="8" Foreground="#F7C9AE" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ClaudeCompactFableReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ClaudeCompactFablePct" Grid.Column="2" Text="—" FontSize="8" Foreground="#F7C9AE" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ClaudeCompactFableReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
+                            </StackPanel>
                     
-                    </DockPanel>
-                    <DockPanel x:Name="Claude2CompactSection" LastChildFill="True" IsVisible="False">
-                        <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
-                        <TextBlock x:Name="Claude2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
-                        <TextBlock x:Name="Claude2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
-                        <StackPanel Spacing="1">
-                            <Grid x:Name="Claude2Compact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Cl2 5h" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Claude2Compact5hBar" Background="#FF8A65" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Claude2Compact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                        </DockPanel>
+                        <DockPanel x:Name="Claude2CompactSection" LastChildFill="True" IsVisible="False">
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                            <TextBlock x:Name="Claude2CompactEmail" DockPanel.Dock="Top" FontSize="7" Foreground="#777777" TextTrimming="CharacterEllipsis" Margin="0,0,0,1" IsVisible="False" />
+                            <TextBlock x:Name="Claude2CompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
+                            <StackPanel Spacing="1">
+                                <Grid x:Name="Claude2Compact5hRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Cl2 5h" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Claude2Compact5hBar" Background="#FF8A65" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Claude2Compact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Claude2Compact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Claude2Compact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Claude2Compact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Claude2Compact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Cl2 7d" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Claude2Compact7dBar" Background="#FFB74D" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Claude2Compact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Cl2 7d" FontSize="9" Foreground="#FF8A65" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Claude2Compact7dBar" Background="#FFB74D" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Claude2Compact7dTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Claude2Compact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Claude2Compact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Claude2Compact7dPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FFD3C0" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Claude2Compact7dReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Claude2CompactDesignRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Cl2 Dsn" FontSize="9" Foreground="#F48FB1" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Claude2CompactDesignBar" Background="#F48FB1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Claude2CompactDesignTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Claude2CompactDesignRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Cl2 Dsn" FontSize="9" Foreground="#F48FB1" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Claude2CompactDesignBar" Background="#F48FB1" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Claude2CompactDesignTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Claude2CompactDesignPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FCD4E1" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Claude2CompactDesignReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Claude2CompactDesignPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#FCD4E1" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Claude2CompactDesignReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="Claude2CompactFableRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
-                                <TextBlock Text="Cl2 Fab" FontSize="9" Foreground="#E2703A" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="Claude2CompactFableBar" Background="#E2703A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="Claude2CompactFableTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="Claude2CompactFableRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True" IsVisible="False">
+                                    <TextBlock Text="Cl2 Fab" FontSize="9" Foreground="#E2703A" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="Claude2CompactFableBar" Background="#E2703A" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="Claude2CompactFableTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="Claude2CompactFablePct" Grid.Column="2" Text="—" FontSize="8" Foreground="#F7C9AE" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="Claude2CompactFableReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="Claude2CompactFablePct" Grid.Column="2" Text="—" FontSize="8" Foreground="#F7C9AE" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="Claude2CompactFableReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
+                            </StackPanel>
                     
-                    </DockPanel>
-                    <DockPanel x:Name="ZaiCompactSection" LastChildFill="True">
-                        <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
-                        <TextBlock x:Name="ZaiCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
-                        <StackPanel Spacing="1">
-                            <Grid x:Name="ZaiCompactTokenRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Z.ai 5h" FontSize="9" Foreground="#BA68C8" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ZaiCompact5hBar" Background="#BA68C8" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ZaiCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                        </DockPanel>
+                        <DockPanel x:Name="ZaiCompactSection" LastChildFill="True">
+                            <Border DockPanel.Dock="Top" Height="1" Background="#2A2A2A" Margin="0,1,0,3" />
+                            <TextBlock x:Name="ZaiCompactPlan" DockPanel.Dock="Right" Text="" Width="58" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Top" Margin="6,0,0,0" />
+                            <StackPanel Spacing="1">
+                                <Grid x:Name="ZaiCompactTokenRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Z.ai 5h" FontSize="9" Foreground="#BA68C8" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ZaiCompact5hBar" Background="#BA68C8" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ZaiCompact5hTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ZaiCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#E1C5EA" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ZaiCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ZaiCompact5hPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#E1C5EA" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ZaiCompact5hReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                            <Grid x:Name="ZaiCompactRequestsRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
-                                <TextBlock Text="Z.ai Req" FontSize="9" Foreground="#BA68C8" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip.Tip="Monthly Web/MCP requests" />
-                                <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Border Background="#333333" CornerRadius="2" />
-                                    <Border x:Name="ZaiCompactMoBar" Background="#7E57C2" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
-                                    <Border x:Name="ZaiCompactMoTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                <Grid x:Name="ZaiCompactRequestsRow" ColumnDefinitions="58,68,42,*" ClipToBounds="True">
+                                    <TextBlock Text="Z.ai Req" FontSize="9" Foreground="#BA68C8" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip.Tip="Monthly Web/MCP requests" />
+                                    <Grid Grid.Column="1" Width="62" Height="4" Margin="2,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Border Background="#333333" CornerRadius="2" />
+                                        <Border x:Name="ZaiCompactMoBar" Background="#7E57C2" CornerRadius="2" HorizontalAlignment="Left" Width="0" />
+                                        <Border x:Name="ZaiCompactMoTick" Background="#FFFFFF" Width="2" HorizontalAlignment="Left" IsVisible="False" />
+                                    </Grid>
+                                    <TextBlock x:Name="ZaiCompactMoPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#E1C5EA" TextAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ZaiCompactMoReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
-                                <TextBlock x:Name="ZaiCompactMoPct" Grid.Column="2" Text="—" FontSize="8" Foreground="#E1C5EA" TextAlignment="Right" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ZaiCompactMoReset" Grid.Column="3" Text="" FontSize="8" Foreground="#888888" TextAlignment="Right" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
+                            </StackPanel>
                     
-                    </DockPanel>
+                        </DockPanel>
 
-                    <ScrollViewer MaxHeight="240" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="AdditionalAccountsCompact" Spacing="3" />
+                        </StackPanel>
                     </ScrollViewer>
                 </StackPanel>
             </Border>

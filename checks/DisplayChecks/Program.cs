@@ -149,6 +149,31 @@ Check(parsedAccounts[5].Claude?.FiveHour is { UsedPercent: 99, ExpectedPercent: 
       && fh.ResetsAt == DateTimeOffset.Parse("2026-11-03T23:30:00Z"), "Claude #13 5-hour window missing");
 Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Claude 5h only where reported, Codex 24h-only accounts, legacy compatibility");
 
+// Accounts are grouped by provider (Codex, Claude, Z.ai) and sorted by CPA priority, highest first;
+// unset priority goes last and ties fall back to email. ET's accounts as of 2026-11-04.
+var keyType = typeof(UsagePopup).GetNestedType("AccountSortKey", BindingFlags.NonPublic)!;
+object Key(int provider, double? priority, string? mail, int seq) => Activator.CreateInstance(keyType, provider, priority, mail, seq)!;
+var sample = new (string Name, object Key)[]
+{
+    ("codex1 P1", Key(0, 1, "etdofresh@gmail.com", 0)),
+    ("codex2 P5", Key(0, 5, "etdofresh+dev@gmail.com", 1)),
+    ("claude P9", Key(1, 9, "etdofreshai@gmail.com", 2)),
+    ("zai", Key(2, null, null, 4)),
+    ("codex3 P5", Key(0, 5, "etdofreshai@gmail.com", 100)),
+    ("claude3 P8", Key(1, 8, "etgarcia@uno.edu", 101)),
+    ("claude4 P8", Key(1, 8, "etdofresh@gmail.com", 102)),
+    ("claude5 P10", Key(1, 10, "etgarcia@my.uno.edu", 103)),
+    ("claude6 unset", Key(1, null, "aaa@example.com", 104)),
+};
+var item = System.Linq.Expressions.Expression.Parameter(typeof((string, object)));
+var selector = System.Linq.Expressions.Expression.Lambda(
+    System.Linq.Expressions.Expression.Convert(System.Linq.Expressions.Expression.Field(item, "Item2"), keyType), item).Compile();
+var sorted = ((IEnumerable<(string, object)>)typeof(UsagePopup).GetMethod("SortAccounts", BindingFlags.NonPublic | BindingFlags.Static)!
+    .MakeGenericMethod(typeof((string, object))).Invoke(null, new object[] { sample, selector })!).Select(x => x.Item1).ToArray();
+var expectedOrder = new[] { "codex2 P5", "codex3 P5", "codex1 P1", "claude5 P10", "claude P9", "claude4 P8", "claude3 P8", "claude6 unset", "zai" };
+Check(sorted.SequenceEqual(expectedOrder), "Account order wrong: " + string.Join(", ", sorted));
+Console.WriteLine("PASS: accounts grouped by provider, highest priority first, ties by email, unset priority last, Z.ai after Claude");
+
 if (Environment.GetEnvironmentVariable("USAGE_CHECK_LIVE_URL") is { Length: > 0 } liveUrl)
 {
     using var service = new UsageMonitor.Services.UsageApiService(liveUrl);
