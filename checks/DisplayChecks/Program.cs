@@ -52,24 +52,57 @@ Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Serv
 Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com", $"Full title wrong: {title.Inlines.Text}");
 Call("SetTitleWithPlan", title, "Claude", "Max 20x", null,
     new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", 10, now.AddSeconds(-40), "passive", "fresh"), now);
-Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com · live", $"Full title age wrong: {title.Inlines.Text}");
+Check(title.Inlines!.Text == "Claude  Max 20x  P10\netdofresh@gmail.com · live", $"Full title availability wrong: {title.Inlines.Text}");
 var email = new TextBlock { FontSize = 7 };
 Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("etdofresh@gmail.com", null), now);
 Check(email.IsVisible && email.Inlines!.Text == "etdofresh", $"Compact email header wrong: {email.Inlines?.Text}");
 Call("SetCompactEmail", email, null, now);
 Check(!email.IsVisible, "Empty compact email header still visible");
-foreach (var (ago, expected) in new[] { (TimeSpan.FromSeconds(90), "live"), (TimeSpan.FromMinutes(4.5), "4m"),
-             (TimeSpan.FromMinutes(75), "1h"), (TimeSpan.FromDays(3), "3d") })
-{
-    Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now - ago, "active", "fresh"), now);
-    Check(email.Inlines!.Text == $"a@uno.edu · {expected}", $"Data age for {ago} wrong: {email.Inlines.Text}");
-}
+
+// The header badge is availability, not data age: usable accounts read "live" however old their numbers are,
+// and the age moves to the tooltip.
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now.AddMinutes(-4), "active", "fresh"), now);
+Check(email.Inlines!.Text == "a@uno.edu · live", $"Usable account not live: {email.Inlines.Text}");
+Check(((string?)ToolTip.GetTip(email))!.Contains("Data 4m ago: checked with the usage endpoint"), $"Data age missing from tooltip: {ToolTip.GetTip(email)}");
 Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo(null, null, now.AddMinutes(-50), "active", "little_stale"), now);
-Check(email.IsVisible && email.Inlines!.Text == "50m", "Age without email wrong");
+Check(email.IsVisible && email.Inlines!.Text == "live", "Badge without email wrong");
 Check(((Avalonia.Controls.Documents.Run)email.Inlines![0]).Foreground is Avalonia.Media.SolidColorBrush { Color: var c } && c.R == 0xFF,
-    "Little-stale age not amber");
-Check(((string?)ToolTip.GetTip(email))!.StartsWith("Checked with the usage endpoint"), "Age tooltip missing source");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority/data age");
+    "Little-stale live badge not amber");
+
+UsageMonitor.Services.UsageWindow W(double used, DateTimeOffset? reset) => new(used, null, null, reset);
+UsageMonitor.Services.AccountInfo Avail(params UsageMonitor.Services.UsageWindow?[] windows) =>
+    (UsageMonitor.Services.AccountInfo)typeof(UsagePopup).GetMethod("WithAvailability", BindingFlags.NonPublic | BindingFlags.Static)!
+        .Invoke(null, new object[] { new UsageMonitor.Services.AccountInfo("x@uno.edu", null, now, "passive", "fresh"), windows })!;
+string Badge(UsageMonitor.Services.AccountInfo info, DateTimeOffset at)
+{
+    Call("SetCompactEmail", email, info, at);
+    return email.Inlines!.Text!;
+}
+var fiveReset = now.AddHours(4).AddMinutes(58);
+var weekReset = now.AddDays(2).AddHours(3).AddMinutes(10);
+Check(Badge(Avail(W(40, fiveReset), W(60, weekReset)), now) == "x@uno.edu · live", "Usable account not live");
+Check(Badge(Avail(W(100, fiveReset), W(60, weekReset)), now) == "x@uno.edu · 4h 58m", "5h-full countdown wrong");
+Check(Badge(Avail(W(40, fiveReset), W(100, weekReset)), now) == "x@uno.edu · 2d 3h", "7d-full countdown wrong");
+Check(Badge(Avail(W(100, fiveReset), W(100, weekReset)), now) == "x@uno.edu · 2d 3h", "Both full should wait for the later reset");
+Check(Badge(Avail(null, W(99.6, now.AddMinutes(37))), now) == "x@uno.edu · 37m", "Codex with no 5h window wrong");
+Check(Badge(Avail(W(100, null), W(10, weekReset)), now) == "x@uno.edu · out", "Unknown reset should read out");
+Check(((string?)ToolTip.GetTip(email))!.Contains("Out of usage (reset time unknown)"), "Unknown-reset tooltip missing");
+Check(Badge(Avail(W(100, fiveReset), W(60, weekReset)), fiveReset.AddSeconds(1)) == "x@uno.edu · live", "Passed reset should read live");
+// Per-model windows (Fable, Spark, Design) are not passed as account-wide, so they never block.
+var codexBlock = new UsageMonitor.Services.CodexBlock(W(10, fiveReset), W(20, weekReset), W(100, fiveReset), W(100, weekReset), null, null, null);
+var claudeBlock = new UsageMonitor.Services.ClaudeBlock(null, W(30, weekReset), W(100, weekReset), W(100, weekReset), null, null);
+var wide = (IEnumerable<UsageMonitor.Services.UsageWindow?>)typeof(UsagePopup).GetMethod("AccountWideWindows", BindingFlags.NonPublic | BindingFlags.Static)!
+    .Invoke(null, new object?[] { codexBlock, claudeBlock })!;
+Check(Badge(Avail(wide.ToArray()), now) == "x@uno.edu · live", "Per-model full window blocked the account");
+Check(((string?)ToolTip.GetTip(email))!.Contains("Usable now"), "Usable tooltip missing");
+
+// Countdowns tick between refreshes without a re-render.
+Call("SetCompactEmail", email, Avail(W(100, fiveReset), W(60, weekReset)), now);
+Call("RefreshAvailabilityBadges", now.AddHours(1));
+Check(email.Inlines!.Text == "x@uno.edu · 3h 58m", $"Badge did not tick: {email.Inlines.Text}");
+Call("RefreshAvailabilityBadges", now.AddHours(4).AddMinutes(57).AddSeconds(30));
+Check(email.Inlines!.Text == "x@uno.edu · <1m", $"Badge final minute wrong: {email.Inlines.Text}");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, data age tooltip");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},

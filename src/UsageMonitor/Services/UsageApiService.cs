@@ -25,8 +25,10 @@ public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Clau
 // Who an account is: the email usage-api names it by and CLIProxyAPI's routing priority (null when unset),
 // plus how current its numbers are: FetchedAt is when they were true, DataSource is "passive" (seen in
 // CPA request headers) or "active" (usage-endpoint check), Staleness is usage-api's tier for them.
+// Blocked/AvailableAt are filled in by the popup from the account's windows: Blocked when an
+// account-wide window (5h or 7d) is full, AvailableAt the latest reset among the full ones (null = unknown).
 public record AccountInfo(string? Email, double? Priority, DateTimeOffset? FetchedAt = null,
-    string? DataSource = null, string? Staleness = null);
+    string? DataSource = null, string? Staleness = null, bool Blocked = false, DateTimeOffset? AvailableAt = null);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
