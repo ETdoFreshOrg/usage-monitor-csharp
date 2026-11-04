@@ -119,7 +119,21 @@ Call("RefreshAvailabilityBadges", now.AddHours(1));
 Check(email.Inlines!.Text == "x@uno.edu · 3h 58m", $"Badge did not tick: {email.Inlines.Text}");
 Call("RefreshAvailabilityBadges", now.AddHours(4).AddMinutes(57).AddSeconds(30));
 Check(email.Inlines!.Text == "x@uno.edu · <1m", $"Badge final minute wrong: {email.Inlines.Text}");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, 24h badge, data age tooltip");
+// Renewal date trails the badge on the email line; full date in the tooltip; nothing when unset.
+var renewal = new UsageMonitor.Services.Renewal(new DateOnly(2026, 12, 2), "monthly", 28, "manual");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("etdofreshai@gmail.com", 9, now, "passive", "fresh", Renewal: renewal), now);
+Check(email.Inlines!.Text == "etdofreshai · live · renews Dec 2 · 28d", $"Renewal on email line wrong: {email.Inlines.Text}");
+Check(((string?)ToolTip.GetTip(email))!.Contains("Renews Wed Dec 2, 2026 (in 28 days), monthly · entered by hand"), $"Renewal tooltip wrong: {ToolTip.GetTip(email)}");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now, Renewal: renewal with { DaysUntil = 2 }), now);
+Check(((Avalonia.Controls.Documents.Run)email.Inlines![^1]).Foreground is Avalonia.Media.SolidColorBrush { Color: var soon } && soon.R == 0xFF && soon.G == 0xB7,
+    "Renewal within 3 days not amber");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now, Renewal: renewal with { DaysUntil = 0 }), now);
+Check(email.Inlines!.Text == "a@uno.edu · live · renews Dec 2 · today", $"Renewal today wrong: {email.Inlines.Text}");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now), now);
+Check(email.Inlines!.Text == "a@uno.edu · live" && !((string?)ToolTip.GetTip(email))!.Contains("Renews"), "Null renewal still shown");
+Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Services.AccountInfo(null, null, Renewal: renewal), now);
+Check(title.Inlines!.Text == "Claude  Max 20x\nrenews Dec 2 · 28d", $"Title renewal without email wrong: {title.Inlines.Text}");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, 24h badge, data age tooltip, renewal date");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
@@ -148,6 +162,17 @@ Check(parsedAccounts[4].Claude?.FiveHour == null, "Claude #12 without a 5-hour w
 Check(parsedAccounts[5].Claude?.FiveHour is { UsedPercent: 99, ExpectedPercent: 40 } fh
       && fh.ResetsAt == DateTimeOffset.Parse("2026-11-03T23:30:00Z"), "Claude #13 5-hour window missing");
 Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Claude 5h only where reported, Codex 24h-only accounts, legacy compatibility");
+
+using var renewalJson = System.Text.Json.JsonDocument.Parse("""
+{"claude":{"account":{"name":"etdofreshai@gmail.com","priority":9},"renewal":{"renews_at":"2026-12-02","billing_cycle":"monthly","days_until_renewal":28,"source":"manual"}},
+ "codex":{"account":{"name":"etdofresh@gmail.com"},"renewal":null},
+ "codex2":{"account":{"name":"x@example.com"},"renewal":{"renews_at":"soon"}}}
+""");
+var parsedInfo = (IReadOnlyDictionary<string, UsageMonitor.Services.AccountInfo>)typeof(UsageMonitor.Services.UsageApiService)
+    .GetMethod("ParseAccountInfo", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { renewalJson.RootElement })!;
+Check(parsedInfo["claude"].Renewal == new UsageMonitor.Services.Renewal(new DateOnly(2026, 12, 2), "monthly", 28, "manual"), "Renewal not parsed");
+Check(parsedInfo["codex"].Renewal == null && parsedInfo["codex2"].Renewal == null, "Null or malformed renewal not ignored");
+Console.WriteLine("PASS: renewal parsed from usage-api, null/malformed ignored");
 
 // Accounts are grouped by provider (Codex, Claude, Z.ai) and sorted by CPA priority, highest first;
 // unset priority goes last and ties fall back to email. ET's accounts as of 2026-11-04.

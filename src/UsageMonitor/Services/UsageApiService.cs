@@ -30,8 +30,13 @@ public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Clau
 // CPA request headers) or "active" (usage-endpoint check), Staleness is usage-api's tier for them.
 // Blocked/AvailableAt are filled in by the popup from the account's windows: Blocked when an
 // account-wide window (5h or 7d) is full, AvailableAt the latest reset among the full ones (null = unknown).
+// Renewal is the next subscription billing date entered by hand on usage-api (null when unset).
 public record AccountInfo(string? Email, double? Priority, DateTimeOffset? FetchedAt = null,
-    string? DataSource = null, string? Staleness = null, bool Blocked = false, DateTimeOffset? AvailableAt = null);
+    string? DataSource = null, string? Staleness = null, bool Blocked = false, DateTimeOffset? AvailableAt = null,
+    Renewal? Renewal = null);
+
+// usage-api's `renewal`: a calendar date in America/Chicago plus its day count, cycle and source.
+public record Renewal(DateOnly RenewsAt, string? BillingCycle, int? DaysUntil, string? Source);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
@@ -152,9 +157,18 @@ public class UsageApiService : IDisposable
                 || !entry.Value.TryGetProperty("account", out var a) || a.ValueKind != JsonValueKind.Object) continue;
             info[entry.Name] = new AccountInfo(ReadString(a, "name"), ReadDouble(a, "priority"),
                 ReadDateTimeOffset(entry.Value, "fetchedAt"), ReadString(entry.Value, "dataSource"),
-                ReadString(entry.Value, "staleness"));
+                ReadString(entry.Value, "staleness"), Renewal: ParseRenewal(entry.Value));
         }
         return info;
+    }
+
+    private static Renewal? ParseRenewal(JsonElement entry)
+    {
+        if (!entry.TryGetProperty("renewal", out var r) || r.ValueKind != JsonValueKind.Object) return null;
+        if (!DateOnly.TryParseExact(ReadString(r, "renews_at"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var date)) return null;
+        var days = ReadDouble(r, "days_until_renewal");
+        return new Renewal(date, ReadString(r, "billing_cycle"), days is { } d ? (int)d : null, ReadString(r, "source"));
     }
 
     private static IReadOnlyList<UsageAccount> ParseAdditionalAccounts(JsonElement providers)

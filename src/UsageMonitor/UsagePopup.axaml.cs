@@ -2199,12 +2199,12 @@ public partial class UsagePopup : Window
                 Foreground = new SolidColorBrush(PriorityColor),
                 FontSize = Math.Max(6, tb.FontSize - 2),
             });
-        if (!string.IsNullOrWhiteSpace(account?.Email) || HasAvailability(account))
+        if (!string.IsNullOrWhiteSpace(account?.Email) || HasAvailability(account) || account?.Renewal != null)
         {
             tb.Inlines.Add(new LineBreak());
             AddAccountLine(tb.Inlines, account!.Email, account, Math.Max(6, tb.FontSize - 2), now ?? DateTimeOffset.Now);
         }
-        var tips = new[] { AvailabilityTooltip(account), ResetTooltip(resets), DataAgeTooltip(account, now) }.Where(t => t != null);
+        var tips = new[] { AvailabilityTooltip(account), RenewalTooltip(account?.Renewal), ResetTooltip(resets), DataAgeTooltip(account, now) }.Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
 
@@ -2216,12 +2216,44 @@ public partial class UsagePopup : Window
     {
         if (!string.IsNullOrWhiteSpace(email))
             inlines.Add(new Run(email) { Foreground = new SolidColorBrush(EmailColor), FontSize = fontSize, FontWeight = FontWeight.Normal });
-        if (!HasAvailability(account)) return;
-        var badge = new AvailabilityBadge(string.IsNullOrWhiteSpace(email) ? "" : " · ", account!.Blocked, account.AvailableAt);
-        var run = new Run(badge.Text(now))
-            { Foreground = new SolidColorBrush(AvailabilityColor(account)), FontSize = fontSize, FontWeight = FontWeight.Normal };
-        AvailabilityBadges.AddOrUpdate(run, badge);
-        inlines.Add(run);
+        // Separators only between items on this line (the full-view title has other inlines before it).
+        var empty = string.IsNullOrWhiteSpace(email);
+        if (HasAvailability(account))
+        {
+            var badge = new AvailabilityBadge(empty ? "" : " · ", account!.Blocked, account.AvailableAt);
+            empty = false;
+            var run = new Run(badge.Text(now))
+                { Foreground = new SolidColorBrush(AvailabilityColor(account)), FontSize = fontSize, FontWeight = FontWeight.Normal };
+            AvailabilityBadges.AddOrUpdate(run, badge);
+            inlines.Add(run);
+        }
+        if (FormatRenewal(account?.Renewal) is { } renewal)
+            inlines.Add(new Run((empty ? "" : " · ") + renewal)
+            {
+                Foreground = new SolidColorBrush(account!.Renewal!.DaysUntil is <= RenewalSoonDays ? RenewalSoonColor : EmailColor),
+                FontSize = fontSize, FontWeight = FontWeight.Normal,
+            });
+    }
+
+    // Next billing date, entered by hand on usage-api: "renews Dec 2 · 28d"; amber in its last few days.
+    private const int RenewalSoonDays = 3;
+    private static readonly Color RenewalSoonColor = Color.FromRgb(0xFF, 0xB7, 0x4D);
+
+    private static string? FormatRenewal(Renewal? r)
+    {
+        if (r == null) return null;
+        var date = r.RenewsAt.ToString("MMM d", CultureInfo.InvariantCulture);
+        var days = r.DaysUntil switch { null => "", 0 => " · today", { } d => $" · {d}d" };
+        return $"renews {date}{days}";
+    }
+
+    private static string? RenewalTooltip(Renewal? r)
+    {
+        if (r == null) return null;
+        var cycle = string.IsNullOrWhiteSpace(r.BillingCycle) ? "" : $", {r.BillingCycle}";
+        var days = r.DaysUntil switch { null => "", 0 => " (today)", 1 => " (in 1 day)", { } d => $" (in {d} days)" };
+        var source = r.Source == "manual" ? " · entered by hand" : "";
+        return $"Renews {r.RenewsAt.ToString("ddd MMM d, yyyy", CultureInfo.InvariantCulture)}{days}{cycle}{source}";
     }
 
     // Shown once the account has numbers (or is known to be blocked); hidden for an account with no data yet.
@@ -2351,7 +2383,8 @@ public partial class UsagePopup : Window
         tb.Inlines!.Clear();
         AddAccountLine(tb.Inlines, ShortEmail(account?.Email), account, tb.FontSize, now ?? DateTimeOffset.Now);
         tb.IsVisible = tb.Inlines.Count > 0;
-        var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, AvailabilityTooltip(account), DataAgeTooltip(account, now) }
+        var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, AvailabilityTooltip(account),
+                RenewalTooltip(account?.Renewal), DataAgeTooltip(account, now) }
             .Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
