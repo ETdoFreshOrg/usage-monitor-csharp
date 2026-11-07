@@ -25,6 +25,16 @@ public partial class UsagePopup
         accounts ??= Array.Empty<UsageAccount>();
         var changed = !_additionalAccounts.Select(a => (a.Id, a.Name)).SequenceEqual(accounts.Select(a => (a.Id, a.Name)));
         _additionalAccounts = accounts;
+        // Rebuilding tears down and recreates every account card (controls, text layouts,
+        // tooltips, cursors) on each poll. Only do it when what the cards show has changed.
+        var renderKey = AccountsRenderKey(accounts, DateTimeOffset.Now);
+        if (renderKey == _accountsRenderKey)
+        {
+            OrderCompactAccounts();
+            if (changed) AccountsChanged?.Invoke();
+            return;
+        }
+        _accountsRenderKey = renderKey;
         AdditionalAccountsFull.Children.Clear();
         foreach (var old in _extraCompactKeys.Keys) AccountsCompact.Children.Remove(old);
         _extraCompactKeys.Clear();
@@ -131,6 +141,25 @@ public partial class UsagePopup
         OrderCompactAccounts();
         if (changed) AccountsChanged?.Invoke();
     }
+
+    private string? _accountsRenderKey;
+
+    // Everything the additional-account cards are built from. Relative times in them ("in 4h 30m",
+    // "Stale since 3m ago") are minute-resolution, so the minute is part of the key; the countdown
+    // badges tick every 2 s on their own (RefreshAvailabilityBadges) without a rebuild.
+    internal string AccountsRenderKey(IReadOnlyList<UsageAccount> accounts, DateTimeOffset now) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Accounts = accounts,
+            Info = accounts.Select(a => AccountInfoFor(a.Key)),
+            Visible = accounts.Select(a => IsAccountVisible(a.Id)),
+            _config.ShowCodexSpark,
+            _config.ShowClaudeFable,
+            _config.ShowClaudeDesign,
+            _config.CodexUsageUrl,
+            _config.ClaudeUsageUrl,
+            Minute = now.ToUnixTimeSeconds() / 60,
+        });
 
     // usage-api falls back to the key ("claude3") when it has no account name; that is not an email.
     private static string? AccountEmail(UsageAccount account) => account.Name == account.Key ? null : account.Name;

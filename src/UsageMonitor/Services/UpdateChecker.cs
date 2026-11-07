@@ -149,7 +149,8 @@ public class UpdateChecker : IDisposable
         }
     }
 
-    public static bool RestartApp(int restoreFocusProcessId = 0)
+    /// <param name="quiet">Relaunch into the tray without showing the panel (as at login).</param>
+    public static bool RestartApp(int restoreFocusProcessId = 0, bool quiet = false)
     {
         try
         {
@@ -178,6 +179,8 @@ public class UpdateChecker : IDisposable
             // Tells the new instance to wait briefly for this one to release the
             // single-instance lock instead of exiting as a "second instance".
             psi.ArgumentList.Add("--from-restart");
+            if (quiet)
+                psi.ArgumentList.Add("--from-login");
             if (restoreFocusProcessId > 0)
             {
                 psi.ArgumentList.Add("--restore-focus-pid");

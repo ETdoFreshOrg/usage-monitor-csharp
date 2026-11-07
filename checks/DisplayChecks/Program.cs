@@ -199,6 +199,33 @@ var expectedOrder = new[] { "codex2 P5", "codex3 P5", "codex1 P1", "claude5 P10"
 Check(sorted.SequenceEqual(expectedOrder), "Account order wrong: " + string.Join(", ", sorted));
 Console.WriteLine("PASS: accounts grouped by provider, highest priority first, ties by email, unset priority last, Z.ai after Claude");
 
+// Memory watchdog: relaunch only after two consecutive samples over a positive limit.
+const long limit = 1536L * 1024 * 1024;
+Check(!UsageMonitor.Services.MemoryWatchdog.ShouldRestart(1, limit), "Watchdog fired on a single spike");
+Check(UsageMonitor.Services.MemoryWatchdog.ShouldRestart(2, limit), "Watchdog ignored a sustained overrun");
+Check(!UsageMonitor.Services.MemoryWatchdog.ShouldRestart(5, 0), "Watchdog fired with the limit disabled");
+var mem = UsageMonitor.Services.MemoryWatchdog.Read();
+Check(mem.FootprintBytes is > 1024 * 1024 and < 64L * 1024 * 1024 * 1024, $"Implausible footprint {mem.FootprintBytes}");
+if (OperatingSystem.IsMacOS())
+{
+    Check(mem.RegionCount > 100, $"VM region count not read: {mem.RegionCount}");
+    // Must agree with what vmmap reports as the physical footprint (within 25% / 16 MB).
+    var vmmap = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/usr/bin/vmmap",
+        $"--summary {Environment.ProcessId}") { RedirectStandardOutput = true, RedirectStandardError = true })!;
+    var summary = vmmap.StandardOutput.ReadToEnd();
+    vmmap.WaitForExit();
+    var line = summary.Split('\n').FirstOrDefault(l => l.StartsWith("Physical footprint:"));
+    if (line != null)
+    {
+        var parts = line.Split(':')[1].Trim();
+        var value = double.Parse(parts[..^1], CultureInfo.InvariantCulture);
+        var bytes = (long)(value * parts[^1] switch { 'K' => 1024d, 'M' => 1048576d, 'G' => 1073741824d, _ => 1d });
+        var sampled = UsageMonitor.Services.MemoryWatchdog.Read().FootprintBytes;
+        Check(Math.Abs(sampled - bytes) < Math.Max(16L * 1024 * 1024, bytes / 4), $"Footprint {sampled} disagrees with vmmap {bytes}");
+    }
+}
+Console.WriteLine($"PASS: memory watchdog restart rule and self-sampling ({UsageMonitor.Services.MemoryWatchdog.Format(mem)})");
+
 if (Environment.GetEnvironmentVariable("USAGE_CHECK_LIVE_URL") is { Length: > 0 } liveUrl)
 {
     using var service = new UsageMonitor.Services.UsageApiService(liveUrl);

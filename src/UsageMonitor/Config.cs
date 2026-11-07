@@ -47,6 +47,11 @@ public class Config
     // fast is cheap on its end.
     public int RefreshIntervalSeconds { get; set; } = 5;
 
+    // Physical footprint (MB) past which the app relaunches itself rather than keep
+    // growing; 0 disables. A healthy instance sits around 150-650 MB (the top of that
+    // range is transient GPU memory), so 1.5 GB leaves ample headroom.
+    public int MemoryLimitMB { get; set; } = 1536;
+
     // Second Claude account. Renders only when the server exposes providers.claude2
     // AND this flag is true — default true so enabling it server-side lights it up;
     // set false per machine to opt out.

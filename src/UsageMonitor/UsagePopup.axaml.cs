@@ -148,6 +148,7 @@ public partial class UsagePopup : Window
 
     // Auto-update checker
     private UpdateChecker? _updateChecker;
+    private MemoryWatchdog? _memoryWatchdog;
     private bool _updateAvailable;
 
     // Last successful usage snapshot, retained so provider show/hide toggles can
@@ -263,6 +264,11 @@ public partial class UsagePopup : Window
         });
         _updateChecker.Start();
 
+        // Bounded memory no matter what leaks: relaunch past the configured limit.
+        _memoryWatchdog = new MemoryWatchdog(_config.MemoryLimitMB);
+        _memoryWatchdog.LimitExceeded += _ => Dispatcher.UIThread.Post(RestartForMemory);
+        _memoryWatchdog.Start();
+
         SetViewMode(PopupViewMode.Compact);
 
         // Position near taskbar on first show only
@@ -340,10 +346,13 @@ public partial class UsagePopup : Window
     // A provider's name is the click target for that provider's own usage page.
     // Some labels already carry an explanatory tip, so the URL is appended to it
     // rather than replacing it.
+    private static Cursor? _handCursor;
+
     private static void MakeLink(TextBlock label, string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return;
-        label.Cursor = new Cursor(StandardCursorType.Hand);
+        // One shared native cursor instead of a new one per link (links are rebuilt with the cards).
+        label.Cursor = _handCursor ??= new Cursor(StandardCursorType.Hand);
         var existing = ToolTip.GetTip(label) as string;
         ToolTip.SetTip(label, string.IsNullOrEmpty(existing) ? url : $"{existing}\n{url}");
         label.PointerPressed += (_, _) => OpenUrl(url);
@@ -539,6 +548,15 @@ public partial class UsagePopup : Window
         _usageApiService?.Dispose();
         _gateService?.Dispose();
         _updateChecker?.Dispose();
+        _memoryWatchdog?.Dispose();
+    }
+
+    // A fresh process starts back at a normal footprint. Keep a hidden popup hidden.
+    private void RestartForMemory()
+    {
+        if (_shutdownStarted) return;
+        if (UpdateChecker.RestartApp(quiet: !IsVisible))
+            ForceClose();
     }
 
     public void ForceClose()
@@ -955,7 +973,7 @@ public partial class UsagePopup : Window
         {
             var ticks = new uint[4];
             var count = (uint)ticks.Length;
-            if (host_statistics(mach_host_self(), HostCpuLoadInfo, ticks, ref count) != 0 || count < 4)
+            if (host_statistics(HostPort, HostCpuLoadInfo, ticks, ref count) != 0 || count < 4)
                 return false;
             total = ticks.Aggregate<uint, ulong>(0, (sum, value) => sum + value);
             idle = ticks[CpuStateIdle];
@@ -984,7 +1002,7 @@ public partial class UsagePopup : Window
         {
             var stats = new uint[64];
             var count = (uint)stats.Length;
-            if (host_statistics64(mach_host_self(), HostVmInfo64, stats, ref count) != 0 || count < 8)
+            if (host_statistics64(HostPort, HostVmInfo64, stats, ref count) != 0 || count < 8)
                 return false;
             var pageSize = (ulong)Environment.SystemPageSize;
             // Inactive pages are reclaimable cache, so count them as available.
@@ -1023,6 +1041,11 @@ public partial class UsagePopup : Window
     private const int HostCpuLoadInfo = 3;
     private const int HostVmInfo64 = 4;
     private const int CpuStateIdle = 2;
+
+    // mach_host_self() hands out a new send-right reference on every call; take one and reuse it
+    // rather than piling up references on the host port every 2 s.
+    private static uint? _hostPort;
+    private static uint HostPort => _hostPort ??= mach_host_self();
 
     [DllImport("/usr/lib/libSystem.dylib")]
     private static extern uint mach_host_self();
@@ -1303,7 +1326,10 @@ public partial class UsagePopup : Window
         var show = reqs is { Count: > 0 } && _config.ShowGate;
         GateSection.IsVisible = show;
         GateCompactRow.IsVisible = show;
-        if (!show) return;
+        if (!show) { _renderedGate = null; return; }
+        // The strip is 2 x 20 freshly built squares with tooltips; skip the rebuild when nothing changed.
+        if (_renderedGate != null && _renderedGate.SequenceEqual(reqs!)) return;
+        _renderedGate = reqs;
 
         var last = reqs!.Take(GateSlots).Reverse().ToList();
         FillGateStrip(GateStrip, last, 1);
@@ -1332,6 +1358,7 @@ public partial class UsagePopup : Window
     }
 
     private const int GateSlots = 20;
+    private IReadOnlyList<GateRequest>? _renderedGate;
     private static readonly Color GateEmptyColor = Color.FromRgb(0x33, 0x33, 0x33);
     private static readonly Color GatePendingColor = Color.FromRgb(0x5A, 0x5A, 0x5A);
 
