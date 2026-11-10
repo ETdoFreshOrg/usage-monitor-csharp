@@ -27,7 +27,8 @@ public partial class UsagePopup : Window
 
     private const double FullWidth = 572;
     private const double FullHeight = 450;
-    private const double CompactWidth = 390;
+    // Keep the 90 px margin over the compact panel's Width in UsagePopup.axaml (324).
+    private const double CompactWidth = 414;
     private const double CompactHeight = 124;
 
     private readonly Config _config;
@@ -1153,20 +1154,40 @@ public partial class UsagePopup : Window
         });
     }
 
-    // The dashboard link only makes sense when a host is configured; otherwise both
-    // affordances stay hidden rather than opening a dead URL.
+    // Header links: "CPA" (orange) opens the CLI Proxy API itself and "CPA M" (blue) its
+    // manager. Each only makes sense when its URL is configured; otherwise that link's
+    // full and compact affordances stay hidden rather than opening a dead URL.
+    private readonly record struct HeaderLink(string Text, string Tooltip, string? Url, Color Color)
+    {
+        public bool IsVisible => !string.IsNullOrWhiteSpace(Url);
+    }
+
+    private static HeaderLink ProxyHeaderLink(Config config) =>
+        new("CPA", "Open CLI Proxy API", config.CliProxyApiUrl, ClaudeAccentColor);
+
+    private static HeaderLink ManagerHeaderLink(Config config) =>
+        new("CPA M", "Open CPA Manager Plus", config.NineRouterPanelUrl, CodexAccentColor);
+
     private void WireRouterPanelLinks()
     {
-        var url = _config.NineRouterPanelUrl;
-        var hasUrl = !string.IsNullOrWhiteSpace(url);
-        RouterButton.IsVisible = hasUrl;
-        RouterLinkCompact.IsVisible = hasUrl;
-        if (!hasUrl) return;
+        WireHeaderLink(ProxyHeaderLink(_config), ProxyButton, ProxyButtonText, ProxyLinkCompact);
+        WireHeaderLink(ManagerHeaderLink(_config), RouterButton, RouterButtonText, RouterLinkCompact);
+    }
 
-        ToolTip.SetTip(RouterButton, $"Open CPA Manager Plus\n{url}");
-        ToolTip.SetTip(RouterLinkCompact, $"Open CPA Manager Plus\n{url}");
-        RouterButton.Click += (_, _) => OpenUrl(url);
-        RouterLinkCompact.PointerPressed += (_, _) => OpenUrl(url);
+    private static void WireHeaderLink(HeaderLink link, Button button, TextBlock buttonText, TextBlock compact)
+    {
+        button.IsVisible = link.IsVisible;
+        compact.IsVisible = link.IsVisible;
+        buttonText.Text = compact.Text = link.Text;
+        buttonText.Foreground = compact.Foreground = new SolidColorBrush(link.Color);
+        if (!link.IsVisible) return;
+
+        var url = link.Url!;
+        var tip = $"{link.Tooltip}\n{url}";
+        ToolTip.SetTip(button, tip);
+        ToolTip.SetTip(compact, tip);
+        button.Click += (_, _) => OpenUrl(url);
+        compact.PointerPressed += (_, _) => OpenUrl(url);
     }
 
     public bool IsProviderVisible(ProviderToggle toggle) => toggle switch
@@ -1852,8 +1873,8 @@ public partial class UsagePopup : Window
         CompactView.IsVisible = mode == PopupViewMode.Compact;
 
         CompactButton.IsVisible = mode == PopupViewMode.Full;
-        RouterButton.IsVisible = mode == PopupViewMode.Full
-            && !string.IsNullOrWhiteSpace(_config.NineRouterPanelUrl);
+        ProxyButton.IsVisible = mode == PopupViewMode.Full && ProxyHeaderLink(_config).IsVisible;
+        RouterButton.IsVisible = mode == PopupViewMode.Full && ManagerHeaderLink(_config).IsVisible;
         CloseButton.IsVisible = mode == PopupViewMode.Full;
         UpdateUpdateAffordances();
 

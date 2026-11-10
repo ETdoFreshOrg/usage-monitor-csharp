@@ -41,7 +41,10 @@ public class Config
 
     // Legacy recent-request strip source, independent of the quota API.
     public string NineRouterUrl { get; set; } = "http://etzminisforumx1pro.lan:20129";
+    // Header links: "CPA M" opens the CPA Manager Plus dashboard, "CPA" the CLI Proxy API
+    // server itself (its root lists the proxy's endpoints). Empty hides that link.
     public string ProxyDashboardUrl { get; set; } = "http://etzminisforumx1pro.lan:18317/management.html#/accounts";
+    public string CliProxyApiUrl { get; set; } = "http://etzminisforumx1pro.lan:8317/";
 
     // Refresh interval in seconds. Default 5 — usage-api caches snapshots so polling
     // fast is cheap on its end.

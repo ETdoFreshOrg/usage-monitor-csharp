@@ -319,7 +319,7 @@
                     IsVisible="False"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
-                    Width="300"
+                    Width="324"
                     Background="#E6181818"
                     CornerRadius="18"
                     BorderBrush="#404040"
@@ -336,10 +336,17 @@
                                        VerticalAlignment="Center"
                                        Cursor="Hand"
                                        ToolTip.Tip="Open usage dashboard" />
-                            <TextBlock x:Name="RouterLinkCompact"
+                            <!-- CPA = the CLI Proxy API itself, CPA M = its manager; colours set in WireRouterPanelLinks. -->
+                            <TextBlock x:Name="ProxyLinkCompact"
                                        Text="CPA"
                                        FontSize="9"
-                                       Foreground="#4DB6AC"
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center"
+                                       Cursor="Hand"
+                                       ToolTip.Tip="Open CLI Proxy API" />
+                            <TextBlock x:Name="RouterLinkCompact"
+                                       Text="CPA M"
+                                       FontSize="9"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center"
                                        Cursor="Hand"
@@ -716,16 +723,31 @@
                                VerticalAlignment="Center" />
                 </Button>
 
+                <Button x:Name="ProxyButton"
+                        Width="36" Height="24"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="12"
+                        Padding="0"
+                        ToolTip.Tip="Open CLI Proxy API">
+                    <TextBlock x:Name="ProxyButtonText"
+                               Text="CPA"
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Button>
+
                 <Button x:Name="RouterButton"
-                        Width="52" Height="24"
+                        Width="44" Height="24"
                         Background="Transparent"
                         BorderThickness="0"
                         CornerRadius="12"
                         Padding="0"
                         ToolTip.Tip="Open CPA Manager Plus">
-                    <TextBlock Text="CPA"
+                    <TextBlock x:Name="RouterButtonText"
+                               Text="CPA M"
                                FontSize="10"
-                               Foreground="#4DB6AC"
                                FontWeight="SemiBold"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center" />

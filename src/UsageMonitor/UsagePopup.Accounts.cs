@@ -66,7 +66,7 @@ public partial class UsagePopup
             // grey those out and say how old they are instead of passing them off as live.
             var stale = account.Staleness == "stale";
             var exhausted = !stale && windows.Any(w => w.Window.UsedPercent >= 100);
-            var color = stale ? StaleColor : exhausted ? ExhaustedColor : Color.Parse(codex ? "#64B5F6" : "#FFB74D");
+            var color = stale ? StaleColor : exhausted ? ExhaustedColor : (codex ? CodexAccentColor : ClaudeAccentColor);
             var plan = account.Codex?.PlanType ?? account.Claude?.SubscriptionType;
             var resets = account.Codex?.Resets ?? account.Claude?.Resets;
             var full = new StackPanel { Spacing = 3 };
@@ -217,6 +217,9 @@ public partial class UsagePopup
     }
 
     private static readonly Color StaleColor = Color.Parse("#777777");
+    // Account-card accents, shared with the header's CPA (orange) and CPA M (blue) links.
+    private static readonly Color CodexAccentColor = Color.Parse("#64B5F6");
+    private static readonly Color ClaudeAccentColor = Color.Parse("#FFB74D");
 
     private static Grid AccountUsageRow(string label, UsageWindow window, Color color)
     {

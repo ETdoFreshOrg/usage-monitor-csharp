@@ -199,6 +199,33 @@ var expectedOrder = new[] { "codex2 P5", "codex3 P5", "codex1 P1", "claude5 P10"
 Check(sorted.SequenceEqual(expectedOrder), "Account order wrong: " + string.Join(", ", sorted));
 Console.WriteLine("PASS: accounts grouped by provider, highest priority first, ties by email, unset priority last, Z.ai after Claude");
 
+// Header links: orange "CPA" opens the CLI Proxy API itself, blue "CPA M" its manager (the old CPA link).
+object? Link(string name, Config config) =>
+    typeof(UsagePopup).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { config });
+T Prop<T>(object? o, string name) => (T)o!.GetType().GetProperty(name)!.GetValue(o)!;
+var defaults = new Config();
+var proxy = Link("ProxyHeaderLink", defaults);
+var manager = Link("ManagerHeaderLink", defaults);
+Check(Prop<string>(proxy, "Text") == "CPA" && Prop<string>(manager, "Text") == "CPA M", "Header link labels wrong");
+Check(Prop<string>(proxy, "Url") == "http://etzminisforumx1pro.lan:8317/", $"CPA should open the CLI Proxy API: {Prop<string>(proxy, "Url")}");
+Check(Prop<string>(manager, "Url") == "http://etzminisforumx1pro.lan:18317/management.html#/accounts", "CPA M should open the manager the old CPA link opened");
+Check(Prop<Avalonia.Media.Color>(proxy, "Color") == Avalonia.Media.Color.Parse("#FFB74D"), "CPA should use the Claude orange");
+Check(Prop<Avalonia.Media.Color>(manager, "Color") == Avalonia.Media.Color.Parse("#64B5F6"), "CPA M should use the Codex blue");
+foreach (var url in new[] { Prop<string>(proxy, "Url"), Prop<string>(manager, "Url") })
+{
+    var uri = new Uri(url);
+    Check(uri.UserInfo == "" && uri.Query == "", $"Header link carries credentials or query parameters: {url}");
+}
+Check(Prop<bool>(proxy, "IsVisible") && Prop<bool>(manager, "IsVisible"), "Configured header links hidden");
+var custom = new Config { CliProxyApiUrl = "https://cpa.example.test/", ProxyDashboardUrl = " " };
+Check(Prop<string>(Link("ProxyHeaderLink", custom), "Url") == "https://cpa.example.test/", "CliProxyApiUrl config not used");
+Check(!Prop<bool>(Link("ManagerHeaderLink", custom), "IsVisible"), "Blank manager URL should hide CPA M");
+Check(!Prop<bool>(Link("ProxyHeaderLink", new Config { CliProxyApiUrl = "" }), "IsVisible"), "Blank proxy URL should hide CPA");
+var roundTrip = System.Text.Json.JsonSerializer.Deserialize<Config>("{\"CliProxyApiUrl\":\"http://h:1/\"}")!;
+Check(roundTrip.CliProxyApiUrl == "http://h:1/" && roundTrip.ProxyDashboardUrl == defaults.ProxyDashboardUrl, "CliProxyApiUrl not read from config.json");
+Check(System.Text.Json.JsonSerializer.Deserialize<Config>("{}")!.CliProxyApiUrl == defaults.CliProxyApiUrl, "Old config.json without CliProxyApiUrl lost the default");
+Console.WriteLine("PASS: header CPA (CLI Proxy API, orange) and CPA M (manager, blue) links, configurable, hidden when blank, no credentials");
+
 // Memory watchdog: relaunch only after two consecutive samples over a positive limit.
 const long limit = 1536L * 1024 * 1024;
 Check(!UsageMonitor.Services.MemoryWatchdog.ShouldRestart(1, limit), "Watchdog fired on a single spike");
