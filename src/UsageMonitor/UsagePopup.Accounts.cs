@@ -89,18 +89,35 @@ public partial class UsagePopup
             SetCompactEmail(emailText, info);
             DockPanel.SetDock(emailText, Dock.Top);
             compact.Children.Add(emailText);
-            var planText = new TextBlock { Width = 58, FontSize = 8, TextAlignment = TextAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6, 0, 0, 0), Foreground = Brush.Parse("#888888") };
-            SetCompactPlan(planText, plan, resets, account.Priority);
-            DockPanel.SetDock(planText, Dock.Right);
-            compact.Children.Add(planText);
+            // Codex: one plan line. Claude: one line per row, so weekly resets sit on 7d and Fable ones on Fab.
+            Control planColumn;
+            TextBlock? planText = null;
+            StackPanel? planSlots = null;
+            if (codex)
+            {
+                planText = new TextBlock { Width = 58, FontSize = 8, TextAlignment = TextAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6, 0, 0, 0), Foreground = Brush.Parse("#888888") };
+                SetCompactPlan(planText, plan, resets, account.Priority);
+                planColumn = planText;
+            }
+            else planColumn = planSlots = new StackPanel { Width = 58, Spacing = 1, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6, 0, 0, 0) };
+            DockPanel.SetDock(planColumn, Dock.Right);
+            compact.Children.Add(planColumn);
             var rows = new StackPanel { Spacing = 1 };
             compact.Children.Add(rows);
             ToolTip.SetTip(compact, account.Name);
+            var rowControls = new List<(string Kind, Control Row)>();
             foreach (var (name, window) in windows)
             {
-                rows.Children.Add(AccountUsageRow(label + " " + name, window, color));
+                var row = AccountUsageRow(label + " " + name, window, color);
+                rowControls.Add((name, row));
+                rows.Children.Add(row);
                 full.Children.Add(AccountUsageRow(name, window, color));
+            }
+            if (planSlots != null)
+            {
+                EnsurePlanSlots(planSlots, rowControls.ToArray());
+                SetClaudeCompactPlan(planSlots, plan, resets, account.Priority, rowControls.Select(r => r.Kind).ToArray());
             }
             WireCompactRowLinks(rows, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
             if (stale)
@@ -123,7 +140,7 @@ public partial class UsagePopup
                 full.Children.Add(new TextBlock { Text = "Credits  " + balance, FontSize = 9, Foreground = new SolidColorBrush(color) });
             }
             if (exhausted)
-                foreach (var text in new[] { title, planText })
+                foreach (var text in new[] { title, planText }.Concat(planSlots?.Children.OfType<TextBlock>() ?? Enumerable.Empty<TextBlock>()).OfType<TextBlock>())
                 {
                     text.Foreground = new SolidColorBrush(color);
                     if (text.Inlines != null)

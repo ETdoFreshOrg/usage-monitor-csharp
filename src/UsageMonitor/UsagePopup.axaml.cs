@@ -1635,7 +1635,6 @@ public partial class UsagePopup : Window
         if (!show || c == null) return;
         var claudeAccount = AccountInfoFor("claude");
         SetTitleWithPlan(ClaudeTitleText, "Claude", c.SubscriptionType, c.Resets, claudeAccount);
-        SetCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets, claudeAccount?.Priority);
         SetCompactEmail(ClaudeCompactEmail, claudeAccount);
         // Only some Claude accounts have a 5-hour limit; the 5h rows show just for those.
         var fiveHour = c.FiveHour is { } fw ? Math.Clamp(fw.UsedPercent, 0, 100) : (double?)null;
@@ -1689,6 +1688,11 @@ public partial class UsagePopup : Window
             _claudeFableReset = null;
         }
 
+        EnsurePlanSlots(ClaudeCompactPlan, ("5h", ClaudeCompact5hRow), ("7d", ClaudeCompact7dRow),
+            ("Des", ClaudeCompactDesignRow), ("Fab", ClaudeCompactFableRow));
+        SetClaudeCompactPlan(ClaudeCompactPlan, c.SubscriptionType, c.Resets, claudeAccount?.Priority,
+            ClaudeRowKinds(c.FiveHour != null, showDesign, showFable));
+
         var range = (c.FiveHour != null ? $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • " : "")
             + $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
         if (_claudeDesignUsed.HasValue)
@@ -1706,7 +1710,6 @@ public partial class UsagePopup : Window
         ClaudeCode2Section.IsVisible = show;
         var claude2Account = AccountInfoFor("claude2");
         SetTitleWithPlan(ClaudeCode2TitleText, "Claude 2", c?.SubscriptionType, c?.Resets, claude2Account);
-        SetCompactPlan(Claude2CompactPlan, c?.SubscriptionType, c?.Resets, claude2Account?.Priority);
         SetCompactEmail(Claude2CompactEmail, claude2Account);
         if (!show)
         {
@@ -1781,6 +1784,11 @@ public partial class UsagePopup : Window
             _claude2FableExpected = null;
             _claude2FableReset = null;
         }
+
+        EnsurePlanSlots(Claude2CompactPlan, ("5h", Claude2Compact5hRow), ("7d", Claude2Compact7dRow),
+            ("Des", Claude2CompactDesignRow), ("Fab", Claude2CompactFableRow));
+        SetClaudeCompactPlan(Claude2CompactPlan, c.SubscriptionType, c.Resets, claude2Account?.Priority,
+            ClaudeRowKinds(c.FiveHour != null, showDesign, showFable));
 
         var range = (c.FiveHour != null ? $"5h: in {FormatResetCountdown(c.FiveHour.ResetsAt)} • " : "")
             + $"7d: {FormatResetDate(c.SevenDay.ResetsAt)}";
@@ -2440,16 +2448,90 @@ public partial class UsagePopup : Window
     // Available limit resets (Claude "Reset for free", Codex reset credits); redeemed on the provider's site.
     private static readonly Color ResetBadgeColor = Color.FromRgb(0x4D, 0xD0, 0xE1);
 
-    private static string? ResetBadge(ResetCredits? r) =>
-        r is { AvailableCount: > 0 } ? $"↻{r.AvailableCount}" : null;
+    // Full-view title: Claude's weekly resets as "↻N", its Fable-only ones as "Fab↻N"; one "↻N" otherwise.
+    private static string? ResetBadge(ResetCredits? r)
+    {
+        if (r == null) return null;
+        var parts = new List<string>();
+        if (r.SevenDayCount > 0) parts.Add($"↻{r.SevenDayCount}");
+        if (r.FableCount > 0) parts.Add($"Fab↻{r.FableCount}");
+        return parts.Count > 0 ? string.Join(" ", parts) : null;
+    }
 
     private static string? ResetTooltip(ResetCredits? r)
     {
         if (r == null) return null;
-        var s = $"{r.AvailableCount} limit reset{(r.AvailableCount == 1 ? "" : "s")} available";
+        static string N(int n, string what) => $"{n} {what}reset{(n == 1 ? "" : "s")}";
+        var s = !r.IsSplit ? N(r.AvailableCount, "limit ") + " available"
+            : r.AvailableCount == 0 ? "No limit resets available"
+            : string.Join(", ", new[] {
+                r.WeeklyCount > 0 ? N(r.WeeklyCount.Value, "weekly ") : null,
+                r.FableCount > 0 ? N(r.FableCount, "Fable ") : null,
+                r.OtherCount > 0 ? N(r.OtherCount, "unrecognized ") + " (counted on 7d)" : null,
+            }.Where(p => p != null)) + " available";
         if (r.NextExpiresAt.HasValue) s += $", expires {FormatCentralTime(r.NextExpiresAt)}";
         if (r.CheckedAt.HasValue) s += $"\nChecked {FormatCentralTime(r.CheckedAt)}";
         return s;
+    }
+
+    // Claude's compact plan column holds one line per usage row ("5h", "7d", "Fab", "Des"), each as tall
+    // as its row, so a reset count sits beside the limit it clears: weekly resets on the 7d line, Fable
+    // resets on the Fab line. Slots are made once per column; a trailing slot takes what has no row.
+    internal static void EnsurePlanSlots(StackPanel column, params (string Kind, Control Row)[] rows)
+    {
+        if (column.Children.Count > 0) return;
+        foreach (var (kind, row) in rows)
+        {
+            var slot = PlanSlot(kind);
+            row.GetObservable(Visual.BoundsProperty).Subscribe(new Avalonia.Reactive.AnonymousObserver<Rect>(b =>
+            {
+                if (b.Height > 0) slot.Height = b.Height;
+            }));
+            column.Children.Add(slot);
+        }
+        column.Children.Add(PlanSlot("extra"));
+    }
+
+    internal static string[] ClaudeRowKinds(bool fiveHour, bool design, bool fable) =>
+        new[] { fiveHour ? "5h" : null, "7d", design ? "Des" : null, fable ? "Fab" : null }.OfType<string>().ToArray();
+
+    private static TextBlock PlanSlot(string kind) => new()
+    {
+        Tag = kind, FontSize = 8, TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.NoWrap,
+        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Foreground = Brush.Parse("#888888"),
+    };
+
+    // visibleKinds: the rows this account shows, so the plan name goes on the first visible line.
+    internal static void SetClaudeCompactPlan(StackPanel column, string? plan, ResetCredits? resets, double? priority,
+        IReadOnlyCollection<string> visibleKinds)
+    {
+        var slots = column.Children.OfType<TextBlock>().ToList();
+        var lines = slots.Where(s => s.Tag is string k && (k == "extra" || visibleKinds.Contains(k))).ToList();
+        var extra = slots.First(s => (string?)s.Tag == "extra");
+        foreach (var slot in slots)
+        {
+            slot.Inlines!.Clear();
+            slot.IsVisible = false;
+        }
+        TextBlock Line(string kind) => lines.FirstOrDefault(s => (string?)s.Tag == kind) ?? extra;
+        void Add(TextBlock slot, string text, Color? color = null)
+        {
+            if (slot.Inlines!.Count > 0) text = " " + text;
+            slot.Inlines.Add(color is { } c ? new Run(text) { Foreground = new SolidColorBrush(c) } : new Run(text));
+        }
+        var first = lines[0];
+        var label = FormatPlan(plan);
+        if (label != null) Add(first, label);
+        if (resets is { SevenDayCount: > 0 }) Add(Line("7d"), $"↻{resets.SevenDayCount}", ResetBadgeColor);
+        if (resets is { FableCount: > 0 })
+        {
+            var fab = Line("Fab");
+            Add(fab, fab == extra ? $"Fab↻{resets.FableCount}" : $"↻{resets.FableCount}", ResetBadgeColor);
+        }
+        var p = FormatPriority(priority);
+        if (p != null) Add(lines.Count > 2 ? lines[1] : extra, p, PriorityColor);
+        foreach (var slot in lines) slot.IsVisible = slot.Inlines!.Count > 0 || slot != extra;
+        ToolTip.SetTip(column, ResetTooltip(resets));
     }
 
     // Compact plan column: reset badge to the right of the plan.

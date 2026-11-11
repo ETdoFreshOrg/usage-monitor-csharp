@@ -10,7 +10,17 @@ public record UsageWindow(
     DateTimeOffset? ResetsAt
 );
 
-public record ResetCredits(int AvailableCount, DateTimeOffset? NextExpiresAt, DateTimeOffset? CheckedAt = null);
+// Claude splits AvailableCount by the limit a reset clears: WeeklyCount the account-wide weekly limit,
+// FableCount only the Fable weekly limit, OtherCount a kind usage-api does not recognize. WeeklyCount is
+// null for Codex and for an older usage-api that sends only the total.
+public record ResetCredits(int AvailableCount, DateTimeOffset? NextExpiresAt, DateTimeOffset? CheckedAt = null,
+    int? WeeklyCount = null, int FableCount = 0, int OtherCount = 0)
+{
+    public bool IsSplit => WeeklyCount.HasValue;
+    // Shown on the 7d line: weekly resets plus unrecognized ones, which are never dropped. Without a split
+    // (older usage-api, Codex) the whole count, as before.
+    public int SevenDayCount => WeeklyCount is { } weekly ? weekly + OtherCount : AvailableCount;
+}
 // FiveHour is null for accounts without a 5-hour limit (or with no open session); hide it then.
 public record ClaudeBlock(UsageWindow? FiveHour, UsageWindow SevenDay, UsageWindow? SevenDayDesign, UsageWindow? SevenDayFable, string? SubscriptionType, ResetCredits? Resets);
 // Codex account-wide windows, each filed by its length: Primary is the 5-hour one, OneDay the 24-hour one,
@@ -247,7 +257,28 @@ public class UsageApiService : IDisposable
         if (!data.TryGetProperty("reset_credits", out var rc) || rc.ValueKind != JsonValueKind.Object)
             return null;
         var count = (int)(ReadInt64(rc, "available_count") ?? 0);
-        return new ResetCredits(count, ReadDateTimeOffset(rc, "next_expires_at"), ReadDateTimeOffset(data, "reset_credits_checked_at"));
+        var weekly = ReadInt64(rc, "weekly_available") is { } w ? (int)w : (int?)null;
+        var fable = (int)(ReadInt64(rc, "fable_available") ?? 0);
+        var other = (int)(ReadInt64(rc, "other_available") ?? 0);
+        if (other > 0) LogUnknownResets(other, rc);
+        return new ResetCredits(count, ReadDateTimeOffset(rc, "next_expires_at"), ReadDateTimeOffset(data, "reset_credits_checked_at"),
+            weekly, fable, other);
+    }
+
+    // Resets of a kind usage-api could not classify are shown on the 7d line; note them (once per label set).
+    private static readonly HashSet<string> LoggedUnknownResets = new();
+    internal static Action<string> UnknownResetLog = AppLog.WriteLine; // checks capture it instead of the real log
+    private static void LogUnknownResets(int count, JsonElement rc)
+    {
+        var labels = new List<string>();
+        if (rc.TryGetProperty("credits", out var credits) && credits.ValueKind == JsonValueKind.Array)
+            foreach (var c in credits.EnumerateArray())
+                if (ReadString(c, "type") == "other")
+                    labels.Add(ReadString(c, "grant_id") ?? ReadString(c, "label") ?? "?");
+        var key = string.Join(", ", labels.Distinct());
+        lock (LoggedUnknownResets)
+            if (!LoggedUnknownResets.Add(key)) return;
+        UnknownResetLog($"Reset credits of unknown kind ({count}) shown on the 7d line: {(key.Length > 0 ? key : "no detail")}");
     }
 
     // Which Codex slot a window of this length belongs to; the same cut-offs as usage-api

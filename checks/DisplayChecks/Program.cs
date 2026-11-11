@@ -226,6 +226,55 @@ Check(roundTrip.CliProxyApiUrl == "http://h:1/" && roundTrip.ProxyDashboardUrl =
 Check(System.Text.Json.JsonSerializer.Deserialize<Config>("{}")!.CliProxyApiUrl == defaults.CliProxyApiUrl, "Old config.json without CliProxyApiUrl lost the default");
 Console.WriteLine("PASS: header CPA (CLI Proxy API, orange) and CPA M (manager, blue) links, configurable, hidden when blank, no credentials");
 
+// Reset credits: Claude's weekly resets on the 7d line, Fable-only ones on the Fab line.
+UsageMonitor.Services.ResetCredits ParseResets(string json) =>
+    (UsageMonitor.Services.ResetCredits)typeof(UsageMonitor.Services.UsageApiService)
+        .GetMethod("ParseResetCredits", BindingFlags.NonPublic | BindingFlags.Static)!
+        .Invoke(null, new object[] { System.Text.Json.JsonDocument.Parse(json).RootElement })!;
+var resetLog = new List<string>();
+typeof(UsageMonitor.Services.UsageApiService).GetField("UnknownResetLog", BindingFlags.NonPublic | BindingFlags.Static)!
+    .SetValue(null, (Action<string>)resetLog.Add);
+var split = ParseResets("{\"reset_credits\":{\"available_count\":3,\"weekly_available\":1,\"fable_available\":2,\"other_available\":0,\"next_expires_at\":\"2026-12-10T22:00:00+00:00\"}}");
+Check(split.IsSplit && split.SevenDayCount == 1 && split.FableCount == 2, $"Split resets misread: {split}");
+var old = ParseResets("{\"reset_credits\":{\"available_count\":2,\"next_expires_at\":null}}");
+Check(!old.IsSplit && old.SevenDayCount == 2 && old.FableCount == 0, $"Older usage-api count not kept on 7d: {old}");
+var unknown = ParseResets("{\"reset_credits\":{\"available_count\":3,\"weekly_available\":1,\"fable_available\":0,\"other_available\":2}}");
+Check(unknown.SevenDayCount == 3 && unknown.FableCount == 0, "Unknown resets not shown on the 7d line");
+ParseResets("{\"reset_credits\":{\"available_count\":3,\"weekly_available\":1,\"fable_available\":0,\"other_available\":2}}");
+Check(resetLog.Count == 1 && resetLog[0].Contains("unknown kind (2)"), $"Unknown resets not logged exactly once: {string.Join(" / ", resetLog)}");
+Check(split.FableCount == 2 && resetLog.Count == 1, "Known resets logged as unknown");
+
+Dictionary<string, string> PlanLines(UsageMonitor.Services.ResetCredits? r, double? priority, params string[] kinds)
+{
+    var column = new StackPanel();
+    var rows = new[] { "5h", "7d", "Fab", "Des" }.Select(k => (k, (Control)new Grid())).ToArray();
+    Call("EnsurePlanSlots", column, rows);
+    Call("SetClaudeCompactPlan", column, "Max 20x", r, priority, kinds);
+    return column.Children.OfType<TextBlock>().Where(t => t.IsVisible).ToDictionary(t => (string)t.Tag!, t => t.Inlines!.Text ?? "");
+}
+string Show(Dictionary<string, string> d) => string.Join(" | ", d.Select(kv => $"{kv.Key}={kv.Value}"));
+var lines = PlanLines(split, 10, "7d", "Fab");
+Check(lines["7d"] == "Max 20x ↻1" && lines["Fab"] == "↻2 P10" && !lines.ContainsKey("extra"), $"Split plan column wrong: {Show(lines)}");
+lines = PlanLines(split, null, "5h", "7d", "Fab");
+Check(lines["5h"] == "Max 20x" && lines["7d"] == "↻1" && lines["Fab"] == "↻2", $"Weekly reset not on 7d under a 5h row: {Show(lines)}");
+lines = PlanLines(split with { WeeklyCount = 0 }, 3, "7d", "Fab");
+Check(lines["7d"] == "Max 20x" && lines["Fab"] == "↻2 P3", $"Zero weekly resets not hidden: {Show(lines)}");
+lines = PlanLines(split with { FableCount = 0, AvailableCount = 1 }, 3, "7d", "Fab");
+Check(lines["7d"] == "Max 20x ↻1" && lines["Fab"] == "P3", $"Zero Fable resets not hidden: {Show(lines)}");
+lines = PlanLines(old, 9, "7d", "Fab");
+Check(lines["7d"] == "Max 20x ↻2" && lines["Fab"] == "P9", $"Older usage-api fallback wrong: {Show(lines)}");
+lines = PlanLines(split, null, "7d");
+Check(lines["7d"] == "Max 20x ↻1" && lines["extra"] == "Fab↻2", $"Fable reset lost when the Fab row is hidden: {Show(lines)}");
+lines = PlanLines(null, null, "7d", "Fab");
+Check(lines["7d"] == "Max 20x" && lines["Fab"] == "" && !lines.ContainsKey("extra"), $"No-reset plan column wrong: {Show(lines)}");
+Check((string?)Call("ResetBadge", split) == "↻1 Fab↻2" && (string?)Call("ResetBadge", old) == "↻2"
+    && Call("ResetBadge", split with { WeeklyCount = 0, FableCount = 0, AvailableCount = 0 }) == null, "Full-view reset badge wrong");
+var tip = (string)Call("ResetTooltip", split)!;
+Check(tip.StartsWith("1 weekly reset, 2 Fable resets available"), $"Reset tooltip wrong: {tip}");
+Check(((string)Call("ResetTooltip", unknown)!).Contains("2 unrecognized resets (counted on 7d)"), "Unknown resets missing from tooltip");
+Check(((string)Call("ResetTooltip", old)!).StartsWith("2 limit resets available"), "Older usage-api tooltip changed");
+Console.WriteLine("PASS: Claude weekly resets on the 7d line, Fable resets on the Fab line, unknown on 7d, older usage-api unchanged");
+
 // Memory watchdog: relaunch only after two consecutive samples over a positive limit.
 const long limit = 1536L * 1024 * 1024;
 Check(!UsageMonitor.Services.MemoryWatchdog.ShouldRestart(1, limit), "Watchdog fired on a single spike");
