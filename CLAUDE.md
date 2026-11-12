@@ -83,6 +83,7 @@ floating popup panel. Built with Avalonia UI.
 ### Key Behaviors
 
 - System tray icon toggles the popup on click
+- "Show Usage Monitor" (and a tray click) re-shows the existing popup in the same process: never relaunch the app to show it. On macOS, `MacOSPlatformOptions.ShowInDock = false` keeps the app an accessory (`LSUIElement`), which is what lets the floating panel join the active Space, including other apps' full-screen Spaces
 - Popup is Topmost (always on top) with no taskbar entry
 - WS_EX_NOACTIVATE on Windows so it doesn't steal focus
 - System stats refresh every 2 seconds while visible

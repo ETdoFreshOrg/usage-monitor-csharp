@@ -278,21 +278,10 @@ public partial class App : Application
 
     private void ShowUsageMonitor()
     {
-        if (_popup is null)
-            return;
-
-        if (OperatingSystem.IsMacOS())
-        {
-            var restoreFocusProcessId = _popup.LastExternalFrontmostProcessId;
-            if (UpdateChecker.RestartApp(restoreFocusProcessId))
-            {
-                MacWindowPresenter.ActivateApplication(restoreFocusProcessId);
-                _popup.ForceClose();
-            }
-            return;
-        }
-
-        _popup.ShowPopup();
+        // Always reuse the existing window in this process. ShowPopup resets the view,
+        // moves it to the pointer's screen and orders it front on the active Space; the
+        // app never relaunches here (only the memory watchdog and updates relaunch it).
+        _popup?.ShowPopup();
     }
 
     private static int GetArgumentInt(string name)

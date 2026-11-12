@@ -57,6 +57,10 @@ class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // Avalonia otherwise forces the Regular activation policy, overriding the
+            // bundle's LSUIElement: the app grows a Dock tile and, as a normal app, its
+            // panel cannot join other apps' full-screen Spaces.
+            .With(new MacOSPlatformOptions { ShowInDock = false })
             .WithInterFont()
             .LogToTrace();
 }
