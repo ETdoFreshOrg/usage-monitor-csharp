@@ -41,12 +41,17 @@ public record UsageAccount(string Key, string Id, string Name, ClaudeBlock? Clau
 // Blocked/AvailableAt are filled in by the popup from the account's windows: Blocked when an
 // account-wide window (5h or 7d) is full, AvailableAt the latest reset among the full ones (null = unknown).
 // Renewal is the next subscription billing date entered by hand on usage-api (null when unset).
+// Expiry is set when the subscription ends instead of renewing (null while it renews).
 public record AccountInfo(string? Email, double? Priority, DateTimeOffset? FetchedAt = null,
     string? DataSource = null, string? Staleness = null, bool Blocked = false, DateTimeOffset? AvailableAt = null,
-    Renewal? Renewal = null);
+    Renewal? Renewal = null, Expiry? Expiry = null);
 
 // usage-api's `renewal`: a calendar date in America/Chicago plus its day count, cycle and source.
 public record Renewal(DateOnly RenewsAt, string? BillingCycle, int? DaysUntil, string? Source);
+
+// usage-api's `expiry`: the last day of a subscription that will not renew (America/Chicago), days left
+// (negative once passed) and where it came from: "provider" (ChatGPT, for Codex) or "manual".
+public record Expiry(DateOnly ExpiresAt, int? DaysUntil, string? Source);
 
 public record UsageApiStatus(
     DateTimeOffset Timestamp,
@@ -167,9 +172,18 @@ public class UsageApiService : IDisposable
                 || !entry.Value.TryGetProperty("account", out var a) || a.ValueKind != JsonValueKind.Object) continue;
             info[entry.Name] = new AccountInfo(ReadString(a, "name"), ReadDouble(a, "priority"),
                 ReadDateTimeOffset(entry.Value, "fetchedAt"), ReadString(entry.Value, "dataSource"),
-                ReadString(entry.Value, "staleness"), Renewal: ParseRenewal(entry.Value));
+                ReadString(entry.Value, "staleness"), Renewal: ParseRenewal(entry.Value), Expiry: ParseExpiry(entry.Value));
         }
         return info;
+    }
+
+    private static Expiry? ParseExpiry(JsonElement entry)
+    {
+        if (!entry.TryGetProperty("expiry", out var x) || x.ValueKind != JsonValueKind.Object) return null;
+        if (!DateOnly.TryParseExact(ReadString(x, "expires_at"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var date)) return null;
+        var days = ReadDouble(x, "days_until_expiry");
+        return new Expiry(date, days is { } d ? (int)d : null, ReadString(x, "source"));
     }
 
     private static Renewal? ParseRenewal(JsonElement entry)

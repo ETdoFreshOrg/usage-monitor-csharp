@@ -2253,12 +2253,12 @@ public partial class UsagePopup : Window
                 Foreground = new SolidColorBrush(PriorityColor),
                 FontSize = Math.Max(6, tb.FontSize - 2),
             });
-        if (!string.IsNullOrWhiteSpace(account?.Email) || HasAvailability(account) || account?.Renewal != null)
+        if (!string.IsNullOrWhiteSpace(account?.Email) || HasAvailability(account) || account?.Renewal != null || account?.Expiry != null)
         {
             tb.Inlines.Add(new LineBreak());
             AddAccountLine(tb.Inlines, account!.Email, account, Math.Max(6, tb.FontSize - 2), now ?? DateTimeOffset.Now);
         }
-        var tips = new[] { AvailabilityTooltip(account), RenewalTooltip(account?.Renewal), ResetTooltip(resets), DataAgeTooltip(account, now) }.Where(t => t != null);
+        var tips = new[] { AvailabilityTooltip(account), ExpiryTooltip(account?.Expiry), RenewalTooltip(account?.Renewal), ResetTooltip(resets), DataAgeTooltip(account, now) }.Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }
 
@@ -2281,7 +2281,14 @@ public partial class UsagePopup : Window
             AvailabilityBadges.AddOrUpdate(run, badge);
             inlines.Add(run);
         }
-        if (FormatRenewal(account?.Renewal) is { } renewal)
+        // An account that will not renew shows its end date in place of the renewal.
+        if (FormatExpiry(account?.Expiry) is { } expiry)
+            inlines.Add(new Run((empty ? "" : " · ") + expiry)
+            {
+                Foreground = new SolidColorBrush(account!.Expiry!.DaysUntil is <= ExpirySoonDays ? ExpirySoonColor : RenewalSoonColor),
+                FontSize = fontSize, FontWeight = FontWeight.SemiBold,
+            });
+        else if (FormatRenewal(account?.Renewal) is { } renewal)
             inlines.Add(new Run((empty ? "" : " · ") + renewal)
             {
                 Foreground = new SolidColorBrush(account!.Renewal!.DaysUntil is <= RenewalSoonDays ? RenewalSoonColor : EmailColor),
@@ -2292,6 +2299,31 @@ public partial class UsagePopup : Window
     // Next billing date, entered by hand on usage-api: "renews Dec 2 · 28d"; amber in its last few days.
     private const int RenewalSoonDays = 3;
     private static readonly Color RenewalSoonColor = Color.FromRgb(0xFF, 0xB7, 0x4D);
+
+    // Subscription end (usage-api's expiry): "expires Dec 9 · 26d", amber; red in its last week and once passed.
+    private const int ExpirySoonDays = 7;
+    private static readonly Color ExpirySoonColor = Color.FromRgb(0xF4, 0x43, 0x36);
+
+    private static string? FormatExpiry(Expiry? x)
+    {
+        if (x == null) return null;
+        var date = x.ExpiresAt.ToString("MMM d", CultureInfo.InvariantCulture);
+        return x.DaysUntil switch
+        {
+            < 0 => $"expired {date}",
+            0 => $"expires {date} · today",
+            { } d => $"expires {date} · {d}d",
+            null => $"expires {date}",
+        };
+    }
+
+    private static string? ExpiryTooltip(Expiry? x)
+    {
+        if (x == null) return null;
+        var days = x.DaysUntil switch { null => "", < 0 and var d => $" ({-d} days ago)", 0 => " (today)", 1 => " (in 1 day)", { } d => $" (in {d} days)" };
+        var source = x.Source == "provider" ? " · will not renew (reported by the provider)" : x.Source == "manual" ? " · entered by hand" : "";
+        return $"{(x.DaysUntil < 0 ? "Expired" : "Expires")} {x.ExpiresAt.ToString("ddd MMM d, yyyy", CultureInfo.InvariantCulture)}{days}{source}";
+    }
 
     private static string? FormatRenewal(Renewal? r)
     {
@@ -2438,7 +2470,7 @@ public partial class UsagePopup : Window
         AddAccountLine(tb.Inlines, ShortEmail(account?.Email), account, tb.FontSize, now ?? DateTimeOffset.Now);
         tb.IsVisible = tb.Inlines.Count > 0;
         var tips = new[] { string.IsNullOrWhiteSpace(account?.Email) ? null : account.Email, AvailabilityTooltip(account),
-                RenewalTooltip(account?.Renewal), DataAgeTooltip(account, now) }
+                ExpiryTooltip(account?.Expiry), RenewalTooltip(account?.Renewal), DataAgeTooltip(account, now) }
             .Where(t => t != null);
         ToolTip.SetTip(tb, tips.Any() ? string.Join("\n", tips) : null);
     }

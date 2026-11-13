@@ -77,7 +77,7 @@ public partial class UsagePopup
                 : new AccountInfo(email, account.Priority, account.FetchedAt, null, account.Staleness),
                 AccountWideWindows(account.Codex, account.Claude));
             SetTitleWithPlan(title, (codex ? "Codex #" : "Claude #") + number, plan, resets, info);
-            ToolTip.SetTip(title, string.Join("\n", new[] { account.Name, AvailabilityTooltip(info), RenewalTooltip(info.Renewal), ResetTooltip(resets), DataAgeTooltip(info) }.Where(t => t != null)));
+            ToolTip.SetTip(title, string.Join("\n", new[] { account.Name, AvailabilityTooltip(info), ExpiryTooltip(info.Expiry), RenewalTooltip(info.Renewal), ResetTooltip(resets), DataAgeTooltip(info) }.Where(t => t != null)));
             full.Children.Add(title);
             MakeLink(title, codex ? _config.CodexUsageUrl : _config.ClaudeUsageUrl);
             var compact = new DockPanel { LastChildFill = true };

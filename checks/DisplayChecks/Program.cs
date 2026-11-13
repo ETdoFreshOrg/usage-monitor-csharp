@@ -133,7 +133,20 @@ Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu"
 Check(email.Inlines!.Text == "a@uno.edu · live" && !((string?)ToolTip.GetTip(email))!.Contains("Renews"), "Null renewal still shown");
 Call("SetTitleWithPlan", title, "Claude", "Max 20x", null, new UsageMonitor.Services.AccountInfo(null, null, Renewal: renewal), now);
 Check(title.Inlines!.Text == "Claude  Max 20x\nrenews Dec 2 · 28d", $"Title renewal without email wrong: {title.Inlines.Text}");
-Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, 24h badge, data age tooltip, renewal date");
+// A subscription that will not renew shows its end date in place of the renewal: amber, red in its last week.
+var expiry = new UsageMonitor.Services.Expiry(new DateOnly(2026, 12, 9), 26, "provider");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("etdofresh+dev@gmail.com", null, now, Renewal: renewal, Expiry: expiry), now);
+Check(email.Inlines!.Text == "etdofresh+dev · live · expires Dec 9 · 26d", $"Expiry on email line wrong: {email.Inlines.Text}");
+Check(((Avalonia.Controls.Documents.Run)email.Inlines![^1]).Foreground is Avalonia.Media.SolidColorBrush { Color: var amber } && amber.R == 0xFF && amber.G == 0xB7,
+    "Expiry more than a week out not amber");
+Check(((string?)ToolTip.GetTip(email))!.Contains("Expires Wed Dec 9, 2026 (in 26 days) · will not renew"), $"Expiry tooltip wrong: {ToolTip.GetTip(email)}");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now, Expiry: expiry with { DaysUntil = 3, Source = "manual" }), now);
+Check(((Avalonia.Controls.Documents.Run)email.Inlines![^1]).Foreground is Avalonia.Media.SolidColorBrush { Color: var red } && red.R == 0xF4 && red.G == 0x43,
+    "Expiry within a week not red");
+Check(((string?)ToolTip.GetTip(email))!.Contains("entered by hand"), "Manual expiry tooltip wrong");
+Call("SetCompactEmail", email, new UsageMonitor.Services.AccountInfo("a@uno.edu", null, now, Expiry: expiry with { DaysUntil = -2 }), now);
+Check(email.Inlines!.Text == "a@uno.edu · live · expired Dec 9", $"Past expiry wrong: {email.Inlines.Text}");
+Console.WriteLine("PASS: credit balances, row visibility, reset times (CDT/CST), tooltip clearing, account email/priority, availability badge + ticking, 24h badge, data age tooltip, renewal date, expiry date");
 
 using var accountJson = System.Text.Json.JsonDocument.Parse("""
 {"codex3":{"account":{"id":"third","name":"Third Account"},"data":{"secondary":{"used_percent":35},"credits_balance":"0"}},
@@ -165,14 +178,16 @@ Console.WriteLine("PASS: arbitrary Codex/Claude accounts, identity, credits, Cla
 
 using var renewalJson = System.Text.Json.JsonDocument.Parse("""
 {"claude":{"account":{"name":"etdofreshai@gmail.com","priority":9},"renewal":{"renews_at":"2026-12-02","billing_cycle":"monthly","days_until_renewal":28,"source":"manual"}},
- "codex":{"account":{"name":"etdofresh@gmail.com"},"renewal":null},
- "codex2":{"account":{"name":"x@example.com"},"renewal":{"renews_at":"soon"}}}
+ "codex":{"account":{"name":"etdofresh@gmail.com"},"renewal":null,"expiry":null},
+ "codex2":{"account":{"name":"x@example.com"},"renewal":{"renews_at":"soon"},"expiry":{"expires_at":"2026-12-09","days_until_expiry":26,"source":"provider","ends_at":"2026-12-09T06:15:18.000Z"}}}
 """);
 var parsedInfo = (IReadOnlyDictionary<string, UsageMonitor.Services.AccountInfo>)typeof(UsageMonitor.Services.UsageApiService)
     .GetMethod("ParseAccountInfo", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { renewalJson.RootElement })!;
 Check(parsedInfo["claude"].Renewal == new UsageMonitor.Services.Renewal(new DateOnly(2026, 12, 2), "monthly", 28, "manual"), "Renewal not parsed");
 Check(parsedInfo["codex"].Renewal == null && parsedInfo["codex2"].Renewal == null, "Null or malformed renewal not ignored");
-Console.WriteLine("PASS: renewal parsed from usage-api, null/malformed ignored");
+Check(parsedInfo["codex2"].Expiry == new UsageMonitor.Services.Expiry(new DateOnly(2026, 12, 9), 26, "provider")
+    && parsedInfo["codex"].Expiry == null && parsedInfo["claude"].Expiry == null, "Expiry not parsed");
+Console.WriteLine("PASS: renewal and expiry parsed from usage-api, null/malformed ignored");
 
 // Accounts are grouped by provider (Codex, Claude, Z.ai) and sorted by CPA priority, highest first;
 // unset priority goes last and ties fall back to email. ET's accounts as of 2026-11-04.
