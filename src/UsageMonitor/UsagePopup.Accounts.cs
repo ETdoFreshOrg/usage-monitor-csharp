@@ -124,8 +124,9 @@ public partial class UsagePopup
             {
                 var note = "Stale since " + FormatFetchedAt(account.FetchedAt);
                 var tip = account.Error ?? "usage-api could not refresh this account";
-                var compactNote = new TextBlock { Text = label + " " + note, FontSize = 8, Foreground = new SolidColorBrush(color) };
-                var fullNote = new TextBlock { Text = note, FontSize = 8, Foreground = new SolidColorBrush(color), TextWrapping = TextWrapping.Wrap };
+                // The rest of the account is greyed; its refresh note stays bright so it stands out.
+                var compactNote = new TextBlock { Text = label + " " + note, FontSize = 8, Foreground = new SolidColorBrush(StaleNoteColor) };
+                var fullNote = new TextBlock { Text = note, FontSize = 8, Foreground = new SolidColorBrush(StaleNoteColor), TextWrapping = TextWrapping.Wrap };
                 ToolTip.SetTip(compactNote, tip);
                 ToolTip.SetTip(fullNote, tip);
                 rows.Children.Add(compactNote);
@@ -234,6 +235,7 @@ public partial class UsagePopup
     }
 
     private static readonly Color StaleColor = Color.Parse("#777777");
+    private static readonly Color StaleNoteColor = Color.FromRgb(0xFF, 0xB7, 0x4D);
     // Account-card accents, shared with the header's CPA (orange) and CPA M (blue) links.
     private static readonly Color CodexAccentColor = Color.Parse("#64B5F6");
     private static readonly Color ClaudeAccentColor = Color.Parse("#FFB74D");
