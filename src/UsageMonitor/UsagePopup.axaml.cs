@@ -2437,15 +2437,18 @@ public partial class UsagePopup : Window
     private AccountInfo? AccountInfoFor(string key)
     {
         if (_lastStatus?.Accounts is not { } accounts || !accounts.TryGetValue(key, out var info)) return null;
-        return key switch
-        {
-            "codex" => WithAvailability(info, AccountWideWindows(_lastStatus.Codex, null)),
-            "codex2" => WithAvailability(info, AccountWideWindows(_lastStatus.Codex2, null)),
-            "claude" => WithAvailability(info, AccountWideWindows(null, _lastStatus.Claude)),
-            "claude2" => WithAvailability(info, AccountWideWindows(null, _lastStatus.Claude2)),
-            _ => info,
-        };
+        return FixedAccountWindows(key) is { } windows ? WithAvailability(info, windows) : info;
     }
+
+    // Account-wide windows of the four built-in accounts; null for any other key.
+    private IEnumerable<UsageWindow?>? FixedAccountWindows(string key) => key switch
+    {
+        "codex" => AccountWideWindows(_lastStatus?.Codex, null),
+        "codex2" => AccountWideWindows(_lastStatus?.Codex2, null),
+        "claude" => AccountWideWindows(null, _lastStatus?.Claude),
+        "claude2" => AccountWideWindows(null, _lastStatus?.Claude2),
+        _ => null,
+    };
 
     private static string? FormatPriority(double? priority) =>
         priority is { } p ? "P" + p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : null;

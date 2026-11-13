@@ -192,7 +192,8 @@ Console.WriteLine("PASS: renewal and expiry parsed from usage-api, null/malforme
 // Accounts are grouped by provider (Codex, Claude, Z.ai) and sorted by CPA priority, highest first;
 // unset priority goes last and ties fall back to email. ET's accounts as of 2026-11-04.
 var keyType = typeof(UsagePopup).GetNestedType("AccountSortKey", BindingFlags.NonPublic)!;
-object Key(int provider, double? priority, string? mail, int seq) => Activator.CreateInstance(keyType, provider, priority, mail, seq)!;
+object Key(int provider, double? priority, string? mail, int seq, bool blocked = false, DateTimeOffset? availableAt = null) =>
+    Activator.CreateInstance(keyType, provider, priority, mail, seq, blocked, availableAt)!;
 var sample = new (string Name, object Key)[]
 {
     ("codex1 P1", Key(0, 1, "etdofresh@gmail.com", 0)),
@@ -208,11 +209,37 @@ var sample = new (string Name, object Key)[]
 var item = System.Linq.Expressions.Expression.Parameter(typeof((string, object)));
 var selector = System.Linq.Expressions.Expression.Lambda(
     System.Linq.Expressions.Expression.Convert(System.Linq.Expressions.Expression.Field(item, "Item2"), keyType), item).Compile();
-var sorted = ((IEnumerable<(string, object)>)typeof(UsagePopup).GetMethod("SortAccounts", BindingFlags.NonPublic | BindingFlags.Static)!
-    .MakeGenericMethod(typeof((string, object))).Invoke(null, new object[] { sample, selector })!).Select(x => x.Item1).ToArray();
+string[] SortNames((string, object)[] items) =>
+    ((IEnumerable<(string, object)>)typeof(UsagePopup).GetMethod("SortAccounts", BindingFlags.NonPublic | BindingFlags.Static)!
+        .MakeGenericMethod(typeof((string, object))).Invoke(null, new object[] { items, selector })!).Select(x => x.Item1).ToArray();
+var sorted = SortNames(sample);
 var expectedOrder = new[] { "codex2 P5", "codex3 P5", "codex1 P1", "claude5 P10", "claude P9", "claude4 P8", "claude3 P8", "claude6 unset", "zai" };
 Check(sorted.SequenceEqual(expectedOrder), "Account order wrong: " + string.Join(", ", sorted));
 Console.WriteLine("PASS: accounts grouped by provider, highest priority first, ties by email, unset priority last, Z.ai after Claude");
+
+// Within a provider: live accounts first by priority, then used-up ones by soonest usable again
+// (unknown reset last). ET's accounts as of 2026-11-13.
+DateTimeOffset Nov(int day) => new(2026, 11, day, 12, 0, 0, TimeSpan.FromHours(-6));
+var states = new (string Name, object Key)[]
+{
+    ("codex1 live P5", Key(0, 5, "etdofresh@gmail.com", 0)),
+    ("codex2 out Nov15 P3", Key(0, 3, "etdofresh+dev@gmail.com", 1, true, Nov(15))),
+    ("codex3 out Nov14 P1", Key(0, 1, "etdofreshai@gmail.com", 100, true, Nov(14))),
+    ("claude6 out Nov14 P10", Key(1, 10, "etgarcia@lsuneworleans.edu", 105, true, Nov(14))),
+    ("claude5 out Nov19 P9", Key(1, 9, "etgarcia@my.uno.edu", 104, true, Nov(19))),
+    ("claude7 out Nov19 P8", Key(1, 8, "etdofreshai@gmail.com", 106, true, Nov(19))),
+    ("claude3 live P7", Key(1, 7, "etgarcia@uno.edu", 102)),
+    ("claude4 out Nov17 P5", Key(1, 5, "etdofresh@gmail.com", 103, true, Nov(17))),
+    ("claude9 out unknown P20", Key(1, 20, "x@example.com", 107, true, null)),
+    ("claude8 live P2", Key(1, 2, "y@example.com", 108)),
+    ("zai", Key(2, null, null, 4)),
+};
+var stateOrder = SortNames(states);
+var expectedStates = new[] { "codex1 live P5", "codex3 out Nov14 P1", "codex2 out Nov15 P3",
+    "claude3 live P7", "claude8 live P2", "claude6 out Nov14 P10", "claude4 out Nov17 P5",
+    "claude5 out Nov19 P9", "claude7 out Nov19 P8", "claude9 out unknown P20", "zai" };
+Check(stateOrder.SequenceEqual(expectedStates), "Live/used-up order wrong: " + string.Join(", ", stateOrder));
+Console.WriteLine("PASS: live accounts first by priority, then used-up accounts by soonest reset, within each provider");
 
 // Header links: orange "CPA" opens the CLI Proxy API itself, blue "CPA M" its manager (the old CPA link).
 object? Link(string name, Config config) =>

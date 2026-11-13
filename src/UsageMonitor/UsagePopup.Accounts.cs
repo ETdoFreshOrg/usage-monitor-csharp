@@ -38,9 +38,14 @@ public partial class UsagePopup
         AdditionalAccountsFull.Children.Clear();
         foreach (var old in _extraCompactKeys.Keys) AccountsCompact.Children.Remove(old);
         _extraCompactKeys.Clear();
-        // Same order as the compact list: Codex then Claude, each by CPA priority (highest first).
-        var ordered = SortAccounts(accounts.Select((a, i) => (Account: a,
-            Key: new AccountSortKey(ProviderRank(a.Key), AccountInfoFor(a.Key)?.Priority ?? a.Priority, AccountEmail(a), 100 + i))), x => x.Key);
+        // Same order as the compact list: Codex then Claude, each with live accounts first by CPA priority
+        // (highest first), then used-up accounts by when they are usable again.
+        var ordered = SortAccounts(accounts.Select((a, i) =>
+        {
+            var availability = WithAvailability(new AccountInfo(null, null), AccountWideWindows(a.Codex, a.Claude));
+            return (Account: a, Key: new AccountSortKey(ProviderRank(a.Key), AccountInfoFor(a.Key)?.Priority ?? a.Priority,
+                AccountEmail(a), 100 + i, availability.Blocked, availability.AvailableAt));
+        }), x => x.Key);
         foreach (var (account, sortKey) in ordered)
         {
             if (!IsAccountVisible(account.Id)) continue;
@@ -184,22 +189,31 @@ public partial class UsagePopup
     // Compact account blocks built here, with their place in the provider/priority order.
     private readonly Dictionary<Control, AccountSortKey> _extraCompactKeys = new();
 
-    internal sealed record AccountSortKey(int Provider, double? Priority, string? Email, int Seq);
+    // Blocked: an account-wide window is used up; AvailableAt: when it is usable again (null = unknown).
+    internal sealed record AccountSortKey(int Provider, double? Priority, string? Email, int Seq,
+        bool Blocked, DateTimeOffset? AvailableAt);
 
     private static int ProviderRank(string key) =>
         key.StartsWith("codex", StringComparison.Ordinal) ? 0 : key.StartsWith("claude", StringComparison.Ordinal) ? 1 : 2;
 
-    // Provider (Codex, Claude, Z.ai), then CPA priority highest first (CPA routes to it first),
-    // unset priority last, then email, then the original order.
+    // Provider (Codex, Claude, Z.ai). Within a provider, live accounts come first, by CPA priority highest
+    // first (CPA routes to it first), unset priority last. Used-up accounts follow, soonest usable again
+    // first, unknown reset time last. Ties go to priority, then email, then the original order.
     internal static IEnumerable<T> SortAccounts<T>(IEnumerable<T> items, Func<T, AccountSortKey> key) =>
         items.OrderBy(i => key(i).Provider)
+            .ThenBy(i => key(i).Blocked ? 1 : 0)
+            .ThenBy(i => key(i).Blocked ? key(i).AvailableAt ?? DateTimeOffset.MaxValue : DateTimeOffset.MinValue)
             .ThenBy(i => key(i).Priority.HasValue ? 0 : 1)
             .ThenByDescending(i => key(i).Priority ?? 0)
             .ThenBy(i => key(i).Email ?? "\uffff", StringComparer.OrdinalIgnoreCase)
             .ThenBy(i => key(i).Seq);
 
-    private AccountSortKey FixedKey(string key, int seq) =>
-        new(ProviderRank(key), AccountInfoFor(key)?.Priority, AccountInfoFor(key)?.Email, seq);
+    private AccountSortKey FixedKey(string key, int seq)
+    {
+        var info = AccountInfoFor(key);
+        var availability = WithAvailability(info ?? new AccountInfo(null, null), FixedAccountWindows(key)!);
+        return new(ProviderRank(key), info?.Priority, info?.Email, seq, availability.Blocked, availability.AvailableAt);
+    }
 
     private TextBlock?[] _groupLabels = new TextBlock?[3];
     private static readonly (string Text, string Color)[] GroupLabelStyle =
@@ -213,7 +227,7 @@ public partial class UsagePopup
         {
             (CodexCompactSection, FixedKey("codex", 0)), (Codex2CompactSection, FixedKey("codex2", 1)),
             (ClaudeCompactSection, FixedKey("claude", 2)), (Claude2CompactSection, FixedKey("claude2", 3)),
-            (ZaiCompactSection, new AccountSortKey(2, null, null, 4)),
+            (ZaiCompactSection, new AccountSortKey(2, null, null, 4, false, null)),
         };
         blocks.AddRange(_extraCompactKeys.Select(kv => (kv.Key, kv.Value)));
         var desired = new List<Control>();
