@@ -290,6 +290,28 @@ Check(((string)Call("ResetTooltip", unknown)!).Contains("2 unrecognized resets (
 Check(((string)Call("ResetTooltip", old)!).StartsWith("2 limit resets available"), "Older usage-api tooltip changed");
 Console.WriteLine("PASS: Claude weekly resets on the 7d line, Fable resets on the Fab line, unknown on 7d, older usage-api unchanged");
 
+// Greying an exhausted account keeps its "↻N" reset badges cyan in every place they are drawn.
+bool KeepsCyan(TextBlock tb)
+{
+    tb.Foreground = Avalonia.Media.Brushes.Gray;
+    foreach (var inline in tb.Inlines!.Where(i => !(bool)Call("KeepsOwnColor", i)!))
+        inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
+    var badges = tb.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Where(r => r.Text?.Contains('↻') == true).ToList();
+    return badges.Count > 0 && badges.All(i => i.Foreground is Avalonia.Media.ISolidColorBrush { Color: var c }
+        && c == Avalonia.Media.Color.FromRgb(0x4D, 0xD0, 0xE1));
+}
+var cyanPlan = new TextBlock();
+Call("SetCompactPlan", cyanPlan, "prolite", split, (double?)1);
+var cyanTitle = new TextBlock { FontSize = 10 };
+Call("SetTitleWithPlan", cyanTitle, "Codex #3", "prolite", split, null, now);
+var cyanColumn = new StackPanel();
+Call("EnsurePlanSlots", cyanColumn, new[] { "7d", "Fab" }.Select(k => (k, (Control)new Grid())).ToArray());
+Call("SetClaudeCompactPlan", cyanColumn, "Max 20x", split, (double?)8, new[] { "7d", "Fab" });
+Check(KeepsCyan(cyanPlan) && KeepsCyan(cyanTitle)
+    && cyanColumn.Children.OfType<TextBlock>().Where(t => t.Inlines!.Text?.Contains('↻') == true).All(KeepsCyan),
+    "Reset badge greyed out with its exhausted account");
+Console.WriteLine("PASS: reset badges stay cyan when their account is greyed out");
+
 // Memory watchdog: relaunch only after two consecutive samples over a positive limit.
 const long limit = 1536L * 1024 * 1024;
 Check(!UsageMonitor.Services.MemoryWatchdog.ShouldRestart(1, limit), "Watchdog fired on a single spike");

@@ -145,10 +145,9 @@ public partial class UsagePopup
                 {
                     text.Foreground = new SolidColorBrush(color);
                     if (text.Inlines != null)
-                        foreach (var inline in text.Inlines)
-                            // The availability countdown keeps its own color so "when is this usable" stays readable.
-                            if (inline is not Avalonia.Controls.Documents.Run run || !AvailabilityBadges.TryGetValue(run, out _))
-                                inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
+                        // Reset badges and the availability countdown keep their own colors so they stay readable.
+                        foreach (var inline in text.Inlines.Where(i => !KeepsOwnColor(i)))
+                            inline.ClearValue(Avalonia.Controls.Documents.TextElement.ForegroundProperty);
                 }
             _extraCompactKeys[compact] = sortKey;
             AccountsCompact.Children.Add(compact);

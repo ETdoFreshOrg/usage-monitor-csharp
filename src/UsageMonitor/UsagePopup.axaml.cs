@@ -444,7 +444,7 @@ public partial class UsagePopup : Window
             _textForegrounds[tb] = original = tb.Foreground;
         tb.Foreground = exhausted ? new SolidColorBrush(ExhaustedColor) : original;
         if (exhausted && tb.Inlines != null)
-            foreach (var inline in tb.Inlines)
+            foreach (var inline in tb.Inlines.Where(i => !KeepsOwnColor(i)))
                 inline.ClearValue(TextElement.ForegroundProperty);
     }
 
@@ -2241,11 +2241,7 @@ public partial class UsagePopup : Window
             });
         var badge = ResetBadge(resets);
         if (badge != null)
-            tb.Inlines.Add(new Run($"  {badge}")
-            {
-                Foreground = new SolidColorBrush(ResetBadgeColor),
-                FontSize = Math.Max(6, tb.FontSize - 2),
-            });
+            tb.Inlines.Add(new ResetBadgeRun($"  {badge}") { FontSize = Math.Max(6, tb.FontSize - 2) });
         var priority = FormatPriority(account?.Priority);
         if (priority != null)
             tb.Inlines.Add(new Run($"  {priority}")
@@ -2478,6 +2474,18 @@ public partial class UsagePopup : Window
     // Available limit resets (Claude "Reset for free", Codex reset credits); redeemed on the provider's site.
     private static readonly Color ResetBadgeColor = Color.FromRgb(0x4D, 0xD0, 0xE1);
 
+    // A "↻N" reset badge. It stays cyan even when the rest of its account is greyed out (exhausted or
+    // stale), so the resets that would bring the account back are always easy to spot.
+    internal sealed class ResetBadgeRun : Run
+    {
+        public ResetBadgeRun(string text) : base(text) => Foreground = new SolidColorBrush(ResetBadgeColor);
+        protected override Type StyleKeyOverride => typeof(Run);
+    }
+
+    // Runs that keep their own color when their text is greyed: reset badges and availability countdowns.
+    internal static bool KeepsOwnColor(Inline inline) =>
+        inline is ResetBadgeRun || (inline is Run run && AvailabilityBadges.TryGetValue(run, out _));
+
     // Full-view title: Claude's weekly resets as "↻N", its Fable-only ones as "Fab↻N"; one "↻N" otherwise.
     private static string? ResetBadge(ResetCredits? r)
     {
@@ -2549,14 +2557,16 @@ public partial class UsagePopup : Window
             if (slot.Inlines!.Count > 0) text = " " + text;
             slot.Inlines.Add(color is { } c ? new Run(text) { Foreground = new SolidColorBrush(c) } : new Run(text));
         }
+        void AddBadge(TextBlock slot, string text) =>
+            slot.Inlines!.Add(new ResetBadgeRun(slot.Inlines.Count > 0 ? " " + text : text));
         var first = lines[0];
         var label = FormatPlan(plan);
         if (label != null) Add(first, label);
-        if (resets is { SevenDayCount: > 0 }) Add(Line("7d"), $"↻{resets.SevenDayCount}", ResetBadgeColor);
+        if (resets is { SevenDayCount: > 0 }) AddBadge(Line("7d"), $"↻{resets.SevenDayCount}");
         if (resets is { FableCount: > 0 })
         {
             var fab = Line("Fab");
-            Add(fab, fab == extra ? $"Fab↻{resets.FableCount}" : $"↻{resets.FableCount}", ResetBadgeColor);
+            AddBadge(fab, fab == extra ? $"Fab↻{resets.FableCount}" : $"↻{resets.FableCount}");
         }
         var p = FormatPriority(priority);
         if (p != null) Add(lines.Count > 2 ? lines[1] : extra, p, PriorityColor);
@@ -2573,7 +2583,7 @@ public partial class UsagePopup : Window
         tb.Inlines.Add(new Run(FormatPlan(plan) ?? ""));
         var badge = ResetBadge(resets);
         if (badge != null)
-            tb.Inlines.Add(new Run($" {badge}") { Foreground = new SolidColorBrush(ResetBadgeColor) });
+            tb.Inlines.Add(new ResetBadgeRun($" {badge}"));
         var p = FormatPriority(priority);
         if (p != null)
             tb.Inlines.Add(new Run($" {p}") { Foreground = new SolidColorBrush(PriorityColor) });
